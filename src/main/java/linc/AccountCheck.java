@@ -14,20 +14,17 @@ public class AccountCheck {
     public static String checkAccount(String username,String password,java.sql.Connection con){
         String result="";
 
-        //先判断用户名密码错误情况
-        if(username=="" || password=="" ){
+        if(username=="" || password=="" ){       //先判断用户名密码错误情况
          System.out.println("please enter valid username or password");
             return "请输入有效账号与密码";
         }
 
-        //如果用户名密码格式正确，则扫描判断。
-        String checkSql = "select username,password from user";
+        String checkSql = "select username,password from user";             //如果用户名密码格式正确，则扫描判断。
         ConnectJDBC conn = new ConnectJDBC();
-        //执行SQL语句
-        ResultSet rs = conn.getAndExucuteSQL(checkSql,con);
+        ResultSet rs = conn.getAndExucuteSQL(checkSql,con);             //执行SQL语句
 
-        //设置标签flag，默认不存在（false）
-        Boolean flag =false;
+
+        Boolean flag =false;                //设置标签flag，默认不存在（false）
         try {
             while(rs.next()){
                 if(username.equals(rs.getString("username")) && password.equals(rs.getString("password"))) {
@@ -35,8 +32,7 @@ public class AccountCheck {
                     break;
                 }
             }
-            //根据flag判断
-            if(flag == true)
+            if(flag == true)                    //根据flag判断
                 result="ok";
             else
                 result = "no";
