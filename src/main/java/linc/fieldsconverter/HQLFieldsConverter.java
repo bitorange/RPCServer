@@ -809,8 +809,8 @@ public class HQLFieldsConverter {
      * 1. Key: 字段名 <br/>
      * 2. Value: 转换后的值
      */
-    public ArrayList<HashMap<String, String>> parseCommand(String command, ResultSet resultSet){
-        ArrayList<HashMap<String, String>> finalResult = new ArrayList<HashMap<String, String>>();
+    public ArrayList<ArrayList<String>> parseCommand(String command, ResultSet resultSet){
+        ArrayList<ArrayList<String>> finalResult = new ArrayList<ArrayList<String>>();
         ParseDriver pd = new ParseDriver();
         try {
             /** Start analysing AS tree **/
@@ -872,7 +872,7 @@ public class HQLFieldsConverter {
                     ResultSetMetaData metaData = resultSet.getMetaData();
                     // 对于每一项结果
                     while (resultSet.next()) {
-                        HashMap<String, String> resultOfOneRow = new HashMap<String, String>(); // 每一项行对应的结果
+                        ArrayList<String> resultOfOneRow = new ArrayList<String>(); // 每一项行对应的结果
 
                         // 对于每一个字段
                         for (int i = 1; i <= metaData.getColumnCount(); ++i) {
@@ -891,7 +891,7 @@ public class HQLFieldsConverter {
                                     newContent = rules.applyRules(originalDependentTable.getTableInfo().getTableName(), filedName, newContent);
                                 }
                             }
-                            resultOfOneRow.put(metaData.getColumnName(i), newContent);
+                            resultOfOneRow.add(metaData.getColumnName(i) + "\t" + newContent);
                         }
                         finalResult.add(resultOfOneRow);
                     }
@@ -901,9 +901,9 @@ public class HQLFieldsConverter {
                 if (resultSet != null) {
                     ResultSetMetaData metaData = resultSet.getMetaData();
                     while (resultSet.next()) {
-                        HashMap<String, String> resultOfOneRow = new HashMap<String, String>();
+                        ArrayList<String> resultOfOneRow = new ArrayList<String>();
                         for(int i = 1; i <= metaData.getColumnCount(); ++i){
-                            resultOfOneRow.put(metaData.getColumnName(i), resultSet.getString(i));
+                            resultOfOneRow.add(metaData.getColumnName(i) + resultSet.getString(i));
                         }
                         finalResult.add(resultOfOneRow);
                     }

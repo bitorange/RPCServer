@@ -109,16 +109,30 @@ public class ConnectJDBC {
      * @param resultList
      * @return
      */
-    public JSONObject convertArrayListToJsonOjbect(ArrayList<HashMap<String, String>> resultList) throws Exception {
+    public JSONObject convertArrayListToJsonObject(ArrayList<ArrayList<String>> resultList) throws Exception {
         JSONArray jsonArray = new JSONArray();
-        for(HashMap<String, String> dataRow: resultList){
+        for(ArrayList<String> dataRow: resultList){
             JSONObject jsonObj = new JSONObject();
-            for(String columnName: dataRow.keySet()){
-                String value = (dataRow.get(columnName) == null ? "" : dataRow.get(columnName)).toString();
+            for(int i = 0; i < dataRow.size(); ++i){
+                String resultOfOneRow = dataRow.get(i);
+                String columnName = resultOfOneRow.split("\t")[0];
+                String value = resultOfOneRow.split("\t").length == 2 ? resultOfOneRow.split("\t")[1] : "";
+
+                // TODO: 同名列的处理
+                int sameColumnsNum = 0;
+                for(int j = 0; j < i; ++j){
+                    String anothercolumnName = dataRow.get(j).split("\t")[0];
+                    if(anothercolumnName.equals(columnName)){
+                        sameColumnsNum ++;
+                    }
+                }
+                if(sameColumnsNum > 0){
+                    columnName = columnName + "_" + sameColumnsNum;
+                }
+
                 try {
                     jsonObj.put(columnName, value);
                 } catch (JSONException e) {
-                    // System.err.println("Err: 字段转换成 JSON 数据失败");
                     throw new Exception("字段转换成 JSON 数据失败");
                 }
             }

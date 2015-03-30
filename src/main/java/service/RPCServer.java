@@ -81,7 +81,7 @@ public class RPCServer extends Thread{
         ConnectJDBC conn = new ConnectJDBC();
         ResultSet rs = null;
         String response = null;
-        ArrayList<HashMap<String, String>> result = null;
+        ArrayList<ArrayList<String>> result = null;
         try {
             rs = conn.getAndExucuteSQL(sql,con);
             result = fieldsConverter.parseCommand(sql, rs);
@@ -99,7 +99,7 @@ public class RPCServer extends Thread{
         JSONObject jsonObject;
         try {
             // jsonObject = conn.transformToJsonArray(rs);
-            jsonObject = conn.convertArrayListToJsonOjbect(result);
+            jsonObject = conn.convertArrayListToJsonObject(result);
             response = jsonObject.toString();
         } catch (Exception e) {
             // e.printStackTrace();
