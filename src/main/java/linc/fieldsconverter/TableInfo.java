@@ -12,8 +12,8 @@ import java.util.Date;
  * @version 1.0
  */
 public class TableInfo {
-    public static final String UNKNOW_TABLE = "UNKNOW_TABLE_" + new Date().toString();
-    public static final String UNKNOW_TABLE_ALIAS = "UNKNOW_TABLE_ALIAS_" + new Date().toString();
+    public static final String UNKNOWN_TABLE = "UNKNOWN_TABLE_" + new Date().toString();
+    public static final String UNKNOWN_TABLE_ALIAS = "UNKNOWN_TABLE_ALIAS_" + new Date().toString();
     public static final String FINAL_TABLE = "FINAL_TABLE_" + new Date().toString();
     public static final String NULL_TABLE = "NULL_TABLE";
 

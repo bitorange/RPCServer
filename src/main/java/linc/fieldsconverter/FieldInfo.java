@@ -62,7 +62,9 @@ public class FieldInfo {
     @Override
     public boolean equals(Object fieldInfoObj) {
         FieldInfo fieldInfo = (FieldInfo) fieldInfoObj;
-        return this.filedName.equals(fieldInfo.getFiledName()) && this.fieldAlias.equals(fieldInfo.getFieldAlias());
+        String filedNameWithoutNull = filedName == null ? "" : filedName;
+        String fieldAliasWithoutNull = fieldAlias == null ? "" : filedName;
+        return filedNameWithoutNull.equals(fieldInfo.getFiledName()) && fieldAliasWithoutNull.equals(fieldInfo.getFieldAlias());
     }
 }
 
