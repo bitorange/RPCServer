@@ -16,7 +16,7 @@ import java.util.HashMap;
  */
 public class ConnectJDBC {
      // master节点上日志的路径：/tmp/spark-events/sparksql--master-1427427041872
-     private static final String PATH = "G:\\我的qq文件\\732323685\\FileRecv\\EVENT_LOG_1";      // path是spark SQL执行任务后日志的存放路径
+     private static final String PATH = "/Users/ihainan/tmp/sparksql--master-1427427041872/EVENT_LOG_1";      // path是spark SQL执行任务后日志的存放路径
      private String msg;
      private int code;
 
