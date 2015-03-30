@@ -5,6 +5,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * this class is used to connect the jdbc and execute SQL command.
@@ -13,8 +15,8 @@ import java.sql.*;
  * Created by admin on 2015/3/16.
  */
 public class ConnectJDBC {
-       // master节点上日志的路径：/tmp/spark-events/sparksql--master-1427427041872
-     private static final String PATH = "H:/json.txt";      //path是spark SQL执行任务后日志的存放路径
+     // master节点上日志的路径：/tmp/spark-events/sparksql--master-1427427041872
+     private static final String PATH = "/Users/ihainan/tmp/sparksql--master-1427427041872/EVENT_LOG_1";      // path是spark SQL执行任务后日志的存放路径
      private String msg;
      private int code;
 
@@ -96,5 +98,53 @@ public class ConnectJDBC {
             msg = "success";
         wholeJsonObj.put("result", array).put("time",time.toString()).put("size",size.toString()).put("code",code).put("msg",msg);
         return wholeJsonObj;
+    }
+
+    /**
+     * 将规则转换后的数据再次转换成 JSON Object
+     * @param resultList
+     * @return
+     */
+    public JSONObject convertArrayListToJsonOjbect(ArrayList<HashMap<String, String>> resultList){
+        JSONArray jsonArray = new JSONArray();
+        for(HashMap<String, String> dataRow: resultList){
+            JSONObject jsonObj = new JSONObject();
+            for(String columnName: dataRow.keySet()){
+                String value = (dataRow.get(columnName) == null ? "" : dataRow.get(columnName)).toString();
+                try {
+                    jsonObj.put(columnName, value);
+                } catch (JSONException e) {
+                    System.err.println("Err: 字段转换成 JSON 数据失败");
+                    return null;
+                }
+            }
+            jsonArray.put(jsonObj);
+        }
+
+        // Add field into JSON data
+        JSONObject finalJsonObject = new JSONObject();
+        if(code == 1) {
+            try {
+                finalJsonObject.put("code", code).put("msg", msg);
+            } catch (JSONException e) {
+                System.err.println("Err: 字段转换成 JSON 数据失败");
+                return null;
+            }
+        }
+        else {
+            msg = "success";
+        }
+        try {
+            GetSQLTimeAndInput getSQLInfo = new GetSQLTimeAndInput();       //获取sqlJob的time和input,返回json数据
+            JSONArray sqlJobInfo = getSQLInfo.getLastJobInfo(PATH);     //获取job日志
+            JSONObject timeAndInputInfo = getSQLInfo.getJobTimeAndInput(sqlJobInfo);        //从日志中解析出time和input返回json数据
+            Object time = timeAndInputInfo.get("time");
+            Object size = timeAndInputInfo.get("size");
+            finalJsonObject.put("result", jsonArray).put("time", time.toString()).put("size", size.toString()).put("code", code).put("msg", msg);
+        } catch (JSONException e) {
+            System.err.println("Err: 构造 JSONObject 失败");
+            return null;
+        }
+        return finalJsonObject;
     }
 }

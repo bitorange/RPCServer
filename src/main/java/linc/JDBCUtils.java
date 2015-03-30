@@ -2,7 +2,6 @@ package linc;
 
 import java.sql.*;
 import java.util.ResourceBundle;
-//import org.apache.hive.jdbc.HiveDriver;
 
 /**
  *

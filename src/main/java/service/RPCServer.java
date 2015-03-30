@@ -11,11 +11,13 @@ import com.rabbitmq.client.AMQP.BasicProperties;
 import linc.AccountCheck;
 import linc.ConnectJDBC;
 import linc.JDBCUtils;
+import linc.fieldsconverter.HQLFieldsConverter;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.ResourceBundle;
 import java.util.concurrent.ExecutorService;
@@ -28,25 +30,26 @@ public class RPCServer extends Thread{
     public static Connection connection = null;
     public static Channel channel = null;
     public static QueueingConsumer consumer;
-    private static List<Thread> runningThreads = new ArrayList<Thread>();
+    // private static List<Thread> runningThreads = new ArrayList<Thread>();
     public QueueingConsumer.Delivery delivery;
     public java.sql.Connection con;
     public static int JDBCConnections;
-    private static final String conHost="10.4.21.103";
-    private static final String conUsername="wucheng";
-    private static final String conPassword="123456";
+    private static final String conHost="127.0.0.1";
+    private static final String conUsername="guest";
+    private static final String conPassword="guest";
+    private HQLFieldsConverter fieldsConverter;    // A converter used to convert the result of SQL command
 
 
     static {
         JDBCConnections = Integer.valueOf(ResourceBundle.getBundle("db").getString("JDBCConnections"));
     }
 
-    public  RPCServer(QueueingConsumer.Delivery delivery,java.sql.Connection con){
+    public RPCServer(QueueingConsumer.Delivery delivery,java.sql.Connection con){
         this.delivery = delivery;
-        this.con=con;
+        this.con = con;
     }
 
-    public  RPCServer(){
+    public RPCServer(){
 
     }
 
@@ -64,7 +67,7 @@ public class RPCServer extends Thread{
      */
     private String check(String name,String password,java.sql.Connection con){
         String result= AccountCheck.checkAccount(name, password,con);
-        return "{\"code\": \"10\",\"msg\":\""+result+"\"}";
+        return "{\"code\": \"10\",\"msg\":\"" + result + "\"}";
     }
 
     /**
@@ -74,23 +77,29 @@ public class RPCServer extends Thread{
      * @return json数据格式的数据
      */
     private String sqlExecute(String sql,java.sql.Connection con) {
+        this.fieldsConverter = new HQLFieldsConverter(con);
         ConnectJDBC conn = new ConnectJDBC();
-        ResultSet rs=null;
-        String response=null;
+        ResultSet rs = null;
+        String response = null;
+        ArrayList<HashMap<String, String>> result = null;
         try {
             rs = conn.getAndExucuteSQL(sql,con);
+            result = fieldsConverter.parseCommand(sql, rs);
         }catch (Exception e){
-            response=e.getMessage().toString();
-            response="{\"code\": \"10\",\"msg\": \""+response+"\"}";
+            String msg = e.getMessage();
+            response = "{\"code\": \"10\",\"msg\": \"" + msg + "\"}";
         }
 
         /* 将查询出来的结果转换为json数据格式 */
         JSONObject jsonObject;
         try {
-            jsonObject = conn.transformToJsonArray(rs);
-            response=jsonObject.toString();
-        } catch (JSONException e) {
-            e.printStackTrace();
+            // jsonObject = conn.transformToJsonArray(rs);
+            jsonObject = conn.convertArrayListToJsonOjbect(result);
+            response = jsonObject.toString();
+        } catch (Exception e) {
+            // e.printStackTrace();
+            String msg = e.getMessage();
+            response = "{\"code\": \"10\",\"msg\": \"" + msg + "\"}";
         }finally{
             JDBCUtils.releaseAll();
         }
@@ -120,31 +129,30 @@ public class RPCServer extends Thread{
                 String service = jsonObject.getString("service");
 
                 if (service.equals("check")) {
-                    /*密码校验*/
+                    /* 密码校验 */
                     String name = jsonObject.getString("name");
                     String password = jsonObject.getString("password");
 
-                    RPCServer myserver = new RPCServer();
-                    response = myserver.check(name, password,con);
+                    RPCServer myServer = new RPCServer();
+                    response = myServer.check(name, password,con);
 
                 } else if (service.equals("sqlExecute")) {
-                    /*sql语句执行*/
+                    /* SQL 语句执行 */
                     String sql = jsonObject.getString("sql");
-                    RPCServer myserver = new RPCServer();
-                    response = myserver.sqlExecute(sql,con);
+                    RPCServer myServer = new RPCServer();
+                    response = myServer.sqlExecute(sql,con);
 
                 } else {
-                    /*请求服务出错*/
+                    // TODO: 相应处理
+                    /* 请求服务出错 */
                 }
-
-
             } catch (Exception e) {
                 e.printStackTrace();
-                response = "解析出错等错误";
-                response = "{\"code\": \"10\",\"msg\": \"" + response + "\"}";
+                String msg = "解析出错等错误";
+                response = "{\"code\": \"10\",\"msg\": \"" + msg + "\"}";
             } finally {
-
                 // 将消息返回给信息请求者
+                assert response != null;
                 channel.basicPublish("", props.getReplyTo(), replyProps, response.getBytes("UTF-8"));
                 channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
             }
@@ -154,9 +162,9 @@ public class RPCServer extends Thread{
     }
 
 
-    public static void main(String[] argv) {
+    public static void main(String[] args) {
         ExecutorService pool=null;
-        List<java.sql.Connection> connectionlist=null;
+        List<java.sql.Connection> connectionList = null;
         try {
             /* 设置消息队列监控连接 */
             factory = new ConnectionFactory();
@@ -167,7 +175,7 @@ public class RPCServer extends Thread{
             connection = factory.newConnection();
             channel = connection.createChannel();
 
-            //在服务端重启之后，先删除监控队列中在服务器端开启前收到的无用消息
+            // 在服务端重启之后，先删除监控队列中在服务器端开启前收到的无用消息
             channel.queueDelete(RPC_QUEUE_NAME);
 
             // 声明所监控的消息队列RPC_QUEUE_NAME
@@ -181,15 +189,15 @@ public class RPCServer extends Thread{
 
             System.out.println(" Start Server: Monitor Queue");
 
-            //在创建JDBC连接之前注册driver
+            // 在创建JDBC连接之前注册driver
             JDBCUtils.loadDriver();
 
             // 创建JDBCConnections个JDBC连接
-            connectionlist=new ArrayList<java.sql.Connection>();
+            connectionList=new ArrayList<java.sql.Connection>();
             for(int ii=0;ii<JDBCConnections;ii++) {
                 JDBCUtils jd = new JDBCUtils();
                 java.sql.Connection con = jd.getConnection();
-                connectionlist.add(con);
+                connectionList.add(con);
             }
 
             // 创建一个可重用固定线程数的线程池
@@ -198,10 +206,12 @@ public class RPCServer extends Thread{
             while (true) {
                 // 消费者阻塞监听队列
                 QueueingConsumer.Delivery delivery = consumer.nextDelivery();
-                i = i%JDBCConnections;
+                i = i % JDBCConnections;
+
                 // 创建实现多线程
-                Thread t = new RPCServer(delivery,connectionlist.get(i));
+                Thread t = new RPCServer(delivery,connectionList.get(i));
                 i++;
+
                 // 将线程放入池中进行执行
                 pool.execute(t);
             }
@@ -212,9 +222,8 @@ public class RPCServer extends Thread{
         }
         finally {
             /* release创建的JDBC，线程池，Connection */
-
             for(int ii = 0; ii < JDBCConnections; ii++) {
-                JDBCUtils.connRelease(connectionlist.get(ii));
+                JDBCUtils.connRelease(connectionList.get(ii));
             }
 
             if(pool!=null) {

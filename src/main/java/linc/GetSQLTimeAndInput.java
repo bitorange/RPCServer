@@ -26,17 +26,17 @@ public class GetSQLTimeAndInput {
             rf = new RandomAccessFile(path,"r");
             long len = rf.length();
             long start = rf.getFilePointer();
-            long nextend = start+len-1;
+            long nextEnd = start+len-1;
             String line;
-            rf.seek(nextend);
+            rf.seek(nextEnd);
             int c = -1;
-            while(nextend > start){
+            while(nextEnd > start){
                 c = rf.read();
                 if(c == '\n'||c == '\r' ){
                     line = rf.readLine();
-                    if(line == null){//处理文件末尾是空行这种情况
-                        nextend--;
-                        rf.seek(nextend);
+                    if(line == null){   // 处理文件末尾是空行这种情况
+                        nextEnd--;
+                        rf.seek(nextEnd);
                         continue;
                     }
                     jsonObject = new JSONObject(line);
@@ -45,11 +45,11 @@ public class GetSQLTimeAndInput {
                         break;
                     }
                     System.out.println(line);
-                    nextend--;
+                    nextEnd--;
                 }
-                nextend--;
-                rf.seek(nextend);
-                if(nextend == 0){//当文件指针退至文件开始处，输出第一行
+                nextEnd--;
+                rf.seek(nextEnd);
+                if(nextEnd == 0){//当文件指针退至文件开始处，输出第一行
                     System.out.println(rf.readLine());
                 }
             }
@@ -58,7 +58,7 @@ public class GetSQLTimeAndInput {
         } catch (IOException e) {
             e.printStackTrace();
         }catch(JSONException e){
-            System.out.println("json有问题");
+            System.out.println("JSON 有问题");
         }
         finally{
             try {
@@ -95,7 +95,7 @@ public class GetSQLTimeAndInput {
                     if(!taskMetrics.isNull("Input Metrics")) {       //判断Input Metrics是否存在，因为在有些情况如describe table情况就不存在该key
                         JSONObject inputMetrics = (JSONObject) taskMetrics.get("Input Metrics");
                         Integer inputSize = (Integer) inputMetrics.get("Bytes Read");
-                        totalSize = totalSize + inputSize;      //将每个task的inputsize加入到总吞吐量中
+                        totalSize = totalSize + inputSize;      //将每个 task 的 inputsize 加入到总吞吐量中
                     }
                 }
             } catch (JSONException e) {
@@ -107,7 +107,7 @@ public class GetSQLTimeAndInput {
             jsonTimeAndInput.put("time", totalTime+"ms");
             jsonTimeAndInput.put("size", totalSize+"B");
         }catch(JSONException e){
-            System.out.print("json装入总时间和总大小出问题");
+            System.out.print("JSON 装入总时间和总大小出问题");
         }
         return jsonTimeAndInput;
     }
