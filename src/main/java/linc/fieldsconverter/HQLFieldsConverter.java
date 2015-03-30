@@ -896,7 +896,19 @@ public class HQLFieldsConverter {
                 }
             }
             else{
-                return finalResult;
+                if (resultSet != null) {
+                    ResultSetMetaData metaData = resultSet.getMetaData();
+                    while (resultSet.next()) {
+                        HashMap<String, String> resultOfOneRow = new HashMap<String, String>();
+                        for(int i = 1; i <= metaData.getColumnCount(); ++i){
+                            resultOfOneRow.put(metaData.getColumnName(i), resultSet.getString(i));
+                        }
+                        finalResult.add(resultOfOneRow);
+                    }
+                }
+                else{
+                    return finalResult;
+                }
             }
 
         } catch (ParseException e) {
