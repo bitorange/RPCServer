@@ -16,7 +16,7 @@ import java.util.HashMap;
  */
 public class ConnectJDBC {
      // master节点上日志的路径：/tmp/spark-events/sparksql--master-1427427041872
-     private static final String PATH = "/Users/ihainan/tmp/sparksql--master-1427427041872/EVENT_LOG_1";      // path是spark SQL执行任务后日志的存放路径
+     private static final String PATH = "G:\\我的qq文件\\732323685\\FileRecv\\EVENT_LOG_1";      // path是spark SQL执行任务后日志的存放路径
      private String msg;
      private int code;
 
@@ -25,7 +25,7 @@ public class ConnectJDBC {
      *@param sql
      *@return resultset the Resultset of execute sql command
      **/
-    public  ResultSet getAndExucuteSQL(String sql,Connection conn){
+    public  ResultSet getAndExucuteSQL(String sql,Connection conn) throws Exception {
         Statement stmt = null;
         ResultSet rs = null;
         try {
@@ -34,6 +34,7 @@ public class ConnectJDBC {
         } catch (SQLException e) {
             code = 1;
             msg = "there are some problems with the driver.";
+            throw new Exception(msg);
         }
 
         try {
@@ -46,9 +47,12 @@ public class ConnectJDBC {
                 msg += msgArray[i];
             }
             code = 1 ;
+            throw new Exception(msg);
         }finally {
             JDBCUtils.releaseAll();
         }
+        System.out.println(rs.toString());
+
         return rs;
     }
 
@@ -105,7 +109,7 @@ public class ConnectJDBC {
      * @param resultList
      * @return
      */
-    public JSONObject convertArrayListToJsonOjbect(ArrayList<HashMap<String, String>> resultList){
+    public JSONObject convertArrayListToJsonOjbect(ArrayList<HashMap<String, String>> resultList) throws Exception {
         JSONArray jsonArray = new JSONArray();
         for(HashMap<String, String> dataRow: resultList){
             JSONObject jsonObj = new JSONObject();
@@ -114,8 +118,8 @@ public class ConnectJDBC {
                 try {
                     jsonObj.put(columnName, value);
                 } catch (JSONException e) {
-                    System.err.println("Err: 字段转换成 JSON 数据失败");
-                    return null;
+                    // System.err.println("Err: 字段转换成 JSON 数据失败");
+                    throw new Exception("字段转换成 JSON 数据失败");
                 }
             }
             jsonArray.put(jsonObj);

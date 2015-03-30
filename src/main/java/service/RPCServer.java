@@ -66,7 +66,7 @@ public class RPCServer extends Thread{
      * @return json数据，msg：ok代表登录成功，msg：no代表登录失败，msg：其它代表错误
      */
     private String check(String name,String password,java.sql.Connection con){
-        String result= AccountCheck.checkAccount(name, password,con);
+        String result = AccountCheck.checkAccount(name, password,con);
         return "{\"code\": \"10\",\"msg\":\"" + result + "\"}";
     }
 
@@ -85,9 +85,14 @@ public class RPCServer extends Thread{
         try {
             rs = conn.getAndExucuteSQL(sql,con);
             result = fieldsConverter.parseCommand(sql, rs);
+            if(result == null){
+                throw new Exception("字段转换发生错误");
+            }
         }catch (Exception e){
             String msg = e.getMessage();
             response = "{\"code\": \"10\",\"msg\": \"" + msg + "\"}";
+            System.out.println("111::"+response);
+            return response;
         }
 
         /* 将查询出来的结果转换为json数据格式 */
@@ -104,6 +109,7 @@ public class RPCServer extends Thread{
             JDBCUtils.releaseAll();
         }
 
+        System.out.println("222::"+response);
         return response;
     }
 
@@ -140,7 +146,10 @@ public class RPCServer extends Thread{
                     /* SQL 语句执行 */
                     String sql = jsonObject.getString("sql");
                     RPCServer myServer = new RPCServer();
+
+                    System.out.println("1");
                     response = myServer.sqlExecute(sql,con);
+                    System.out.println("2");
 
                 } else {
                     // TODO: 相应处理
