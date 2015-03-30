@@ -86,7 +86,7 @@ public class HQLFieldsConverter {
      * Analyse QUERY clause
      * Register the dependence info into DEPENDENCY table and return the info the new table
      **/
-    private TableInfo queryAnalyse(ASTNode node, Boolean isRoot){
+    private QueryAnalyseResult queryAnalyse(ASTNode node, Boolean isRoot){
         /* 类型检查 */
         if(node.getToken().getType() != HiveParser.TOK_QUERY) {
             System.err.println("Err: 解析节点不是 TOK_QUERY 类型");
@@ -126,8 +126,9 @@ public class HQLFieldsConverter {
         dependenceOfTables.put(tableName + ", " + alias, insertAnalyseResult.getDependentTables());  // 通过 tableName 和 alias 唯一标记一个 SQL 查询中的某张表
 
         /* 构建信息表 */
-        return new TableInfo(tableName, alias,
+        TableInfo currentTableInfo = new TableInfo(tableName, alias,
                 insertAnalyseResult.getAllSelectedFields());
+        return new QueryAnalyseResult(currentTableInfo, fromAnalyseResult, insertAnalyseResult);
     }
 
     /**
@@ -476,7 +477,7 @@ public class HQLFieldsConverter {
             }
             else if(getChild(fromNode, "TOK_SUBQUERY") != null){
                 ASTNode queryChildNode = getChild(getChild(fromNode, "TOK_SUBQUERY"), "TOK_QUERY");
-                TableInfo tableInfo = queryAnalyse(queryChildNode, false);
+                TableInfo tableInfo = queryAnalyse(queryChildNode, false).getTableInfo();
                 fromTablesInfo.add(tableInfo);
             }
         }
@@ -494,7 +495,7 @@ public class HQLFieldsConverter {
                 }
                 // FROM 子查询
                 else if(child1.getToken().getType() == HiveParser.TOK_SUBQUERY){
-                    TableInfo tableInfo = queryAnalyse(getChild(child1, "TOK_QUERY"), false);
+                    TableInfo tableInfo = queryAnalyse(getChild(child1, "TOK_QUERY"), false).getTableInfo();
                     fromTablesInfo.add(tableInfo);
                 }
                 else{
@@ -514,7 +515,7 @@ public class HQLFieldsConverter {
                         fromTablesInfo.add(tableInfo);
                     }
                     else if(child0.getToken().getType() == HiveParser.TOK_SUBQUERY){
-                        TableInfo tableInfo = queryAnalyse(getChild(child0, "TOK_QUERY"), false);
+                        TableInfo tableInfo = queryAnalyse(getChild(child0, "TOK_QUERY"), false).getTableInfo();
                         fromTablesInfo.add(tableInfo);
                     }
                     else{
@@ -664,6 +665,7 @@ public class HQLFieldsConverter {
     private ArrayList<OriginalDependentTable> getOriginalDependentTables(QueueItem item){
         ArrayList<OriginalDependentTable> originalDependentTables = new ArrayList<OriginalDependentTable>();
 
+
         // 初始化队列
         Queue queue = new LinkedList();
         queue.add(item);
@@ -675,6 +677,11 @@ public class HQLFieldsConverter {
             item = (QueueItem)queue.remove();
             FieldInfo fieldToFind = item.getFieldToFind();
             TableInfo tableToFind = item.getTableToFind();
+
+            // TOK_NULL
+            if(fieldToFind.getFiledName() == null && fieldToFind.getFieldAlias() == null) {
+                return null;
+            }
 
             // 寻找包含该字段（名）的依赖表
             dependentTableToFind = findTable(fieldToFind, tableToFind.getTableName(), tableToFind.getAliasName());
@@ -817,74 +824,90 @@ public class HQLFieldsConverter {
             if(getChild(tree, "TOK_QUERY") != null) {
                 dependenceOfTables = new HashMap<String, ArrayList<DependentTable>>();
 
-                /** Analyse Query ASTNode **/
-                TableInfo finalTableInfo = queryAnalyse((ASTNode) tree.getChild(0), true);
-                if(finalTableInfo == null){
+                // 分析 TOK_QUERY，得到结果
+                QueryAnalyseResult queryAnalyseResult = queryAnalyse((ASTNode) tree.getChild(0), true);
+                if (queryAnalyseResult == null) {
                     System.err.println("Err: 解析失败");
                     return null;
                 }
+                TableInfo finalTableInfo = queryAnalyseResult.getTableInfo();
+                InsertAnalyseResult insertAnalyseResult = queryAnalyseResult.getInsertAnalyseResult();
 
-                /** Get final result after being converted **/
+                // 获取所有字段对应的原始表以及原始表中的字段
+                ArrayList<ArrayList<OriginalDependentTable>> allOriginalDependentTables = new ArrayList<ArrayList<OriginalDependentTable>>();
+                for (int i = 0; i < finalTableInfo.getFields().size(); ++i) {
+                    // 获取原始表和字段
+                    FieldInfo field = finalTableInfo.getFields().get(i);    // SELECT 第 i 个字段
+                    ArrayList<OriginalDependentTable> originalDependentTables = getOriginalDependentTables(new QueueItem(finalTableInfo, field));   // 该字段依赖的表(s)和表中的原始字段
+                    allOriginalDependentTables.add(originalDependentTables);
+
+                    // 存在 SELECT 字段和 INSERT INTO / OVERWRITE 字段，需要继承规则
+                    if (originalDependentTables != null && insertAnalyseResult.getInsertTables().size() > 0
+                            && insertAnalyseResult.getInsertTables().get(0) != null) {
+                        ArrayList<FieldInfo> fieldsToInsert = getFieldsOfATable(insertAnalyseResult.getInsertTables().get(0));  // 只可能 Insert 一张表，所以取 0，获取该表的字段名
+
+                        // 对于没一个依赖的(原始)表
+                        for (OriginalDependentTable originalDependentTable : originalDependentTables) {
+                            String selectedTable = originalDependentTable.getTableInfo().getTableName();
+                            // 对于原始表中的每一个依赖的字段
+                            for (String selectedField : originalDependentTable.getFields()) {
+                                // 检测是否存在对应规则
+                                Rule rule = rules.findRule(selectedTable, selectedField);
+                                // 存在规则
+                                if (rule != null) {
+                                    // 添加规则
+                                    Rule newRule = new Rule(insertAnalyseResult.getInsertTables().get(0),
+                                            fieldsToInsert.get(i).getFiledName(), rule.getRex(), rule.getReplaceContent());
+                                    rules.addNewRule(newRule);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 对结果应用规则
                 if (resultSet != null) {
                     ResultSetMetaData metaData = resultSet.getMetaData();
+                    // 对于每一项结果
                     while (resultSet.next()) {
-                        // Convert all the columns of one row
-                        HashMap<String, String> resultOfOneRow = new HashMap<String, String>();
-                        for (int i = 1; i <= finalTableInfo.getFields().size(); ++i) {
+                        HashMap<String, String> resultOfOneRow = new HashMap<String, String>(); // 每一项行对应的结果
+
+                        // 对于每一个字段
+                        for (int i = 1; i <= metaData.getColumnCount(); ++i) {
                             String value = resultSet.getString(i);
-                            FieldInfo field = finalTableInfo.getFields().get(i - 1);
                             if (value == null) {
                                 value = "";
                             }
-
-                            // TODO: 多张表的情况的处理 [TEST]
-                            ArrayList<OriginalDependentTable> originalDependentTables = getOriginalDependentTables(new QueueItem(finalTableInfo, field));
+                            ArrayList<OriginalDependentTable> originalDependentTables = allOriginalDependentTables.get(i - 1);  // 当前字段所依赖的所有表、表字段
                             String newContent = value;
-                            for(OriginalDependentTable originalDependentTable: originalDependentTables){
-                                // 应用规则
+                            // 每一张原始表
+                            for (OriginalDependentTable originalDependentTable : originalDependentTables) {
+                                // 原始表的每一个依赖字段
                                 for(int j = 0; j < originalDependentTable.getFields().size(); ++j) {
-                                    String fileName = originalDependentTable.getFields().get(j);
-                                    newContent = rules.applyRules(originalDependentTable.getTableInfo().getTableName(), fileName, newContent);
+                                    // 应用规则
+                                    String filedName = originalDependentTable.getFields().get(j);
+                                    newContent = rules.applyRules(originalDependentTable.getTableInfo().getTableName(), filedName, newContent);
                                 }
                             }
-
                             resultOfOneRow.put(metaData.getColumnName(i), newContent);
-
-                            /*
-                            ArrayList<DependentTable> tables = getOriginalTables(field);   // 搜索时候，不用考虑别名
-                            DependentTable t = tables.get(0);
-
-                            // 应用规则
-                            String newContent = rules.applyRules(t.getTableInfo().getTableName(), field.getFiledName(), value);
-                            resultOfOneRow.put(metaData.getColumnName(i), newContent);
-                            */
                         }
                         finalResult.add(resultOfOneRow);
                     }
-                } else {
-                    return finalResult;
                 }
             }
             else{
-                if (resultSet != null) {
-                    ResultSetMetaData metaData = resultSet.getMetaData();
-                    while (resultSet.next()) {
-                        HashMap<String, String> resultOfOneRow = new HashMap<String, String>();
-                        for(int i = 1; i <= metaData.getColumnCount(); ++i){
-                            resultOfOneRow.put(metaData.getColumnName(i), resultSet.getString(i));
-                        }
-                        finalResult.add(resultOfOneRow);
-                    }
-                }
-                else{
-                    return finalResult;
-                }
+                return finalResult;
             }
+
         } catch (ParseException e) {
-            System.err.println("Err: parse SQL command error");
+            System.err.println("Err: parse SQL command error " + e.getMessage());
             return null;
         } catch (SQLException e) {
-            System.err.println("Err: Result Set get next result error");
+            System.err.println("Err: Result Set get next result error " + e.getMessage());
+            return null;
+        } catch (Exception e){
+            // e.printStackTrace();
+            System.err.println("Err: 未知错误 : " + e.getMessage());
             return null;
         }
         return finalResult;
