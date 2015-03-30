@@ -86,7 +86,7 @@ public class HQLFieldsConverter {
      * Analyse QUERY clause
      * Register the dependence info into DEPENDENCY table and return the info the new table
      **/
-    private QueryAnalyseResult queryAnalyse(ASTNode node, Boolean isRoot){
+    private QueryAnalyseResult queryAnalyse(ASTNode node, Boolean isRoot) throws Exception {
         /* 类型检查 */
         if(node.getToken().getType() != HiveParser.TOK_QUERY) {
             System.err.println("Err: 解析节点不是 TOK_QUERY 类型");
@@ -174,12 +174,15 @@ public class HQLFieldsConverter {
                         System.err.println("Err: SELECT * 的情况下，fromTablesInfo 为空");
                         return null;
                     }
-                    TableInfo onlyTableInfo = fromTablesInfo.get(0);    // 只有一张表
-                    DependentTable dependentTable = new DependentTable(onlyTableInfo, onlyTableInfo.getFields());
-                    dependentTables.add(dependentTable);
+                    // TODO: 不一定只有一张表，应该遍历所有的表
+                    for(TableInfo tableInfo: fromTablesInfo) {
+                        // TableInfo onlyTableInfo = fromTablesInfo.get(0);
+                        DependentTable dependentTable = new DependentTable(tableInfo, tableInfo.getFields());
+                        dependentTables.add(dependentTable);
 
-                    // 记录所有的字段
-                    allSelectedFields = dependentTable.getFields();
+                        // 记录所有的字段
+                        allSelectedFields.addAll(dependentTable.getFields());
+                    }
 
                     // 新表只有一个字段，直接 break
                     break;
@@ -360,7 +363,7 @@ public class HQLFieldsConverter {
             ASTNode childAST = (ASTNode) child;
 
             // 如果子节点是函数，或者表达式，递归
-            if(childAST.toString().equals("TOK_FUNCTION") || Arrays.asList(this.OPERATIONS_LIST).contains(childAST.toString())){
+            if(childAST.toString().equals("TOK_FUNCTION") || Arrays.asList(OPERATIONS_LIST).contains(childAST.toString())){
                 oldDependentTables = getAllInnerFields(childAST, oldDependentTables,
                         fromTablesInfo, originalFieldAliasName);
             }
@@ -418,7 +421,6 @@ public class HQLFieldsConverter {
             }
             else{
                 // System.err.println("Err: getAllInnerFields 中出现特殊节点 " + childAST.toString());
-                continue;
             }
         }
 
@@ -460,7 +462,7 @@ public class HQLFieldsConverter {
      * @param fromNode 需要分析，类型为 TOK_FROM 的 AST Node
      * @return 分析结果，中途出现错误则将错误信息打印并返回 null
      */
-    private FromAnalyseResult fromAnalyse(ASTNode fromNode){
+    private FromAnalyseResult fromAnalyse(ASTNode fromNode) throws Exception {
         /* 类型检查 */
         if(fromNode.getToken().getType() != HiveParser.TOK_FROM) {
             System.err.println("Err: 解析节点不是 TOK_FROM 类型");
@@ -586,7 +588,7 @@ public class HQLFieldsConverter {
      * 2. 别名 <br/>
      * 3. 表中存在的字段 <br/>
      */
-    private TableInfo getTableInfoOfNode(ASTNode tableNode){
+    private TableInfo getTableInfoOfNode(ASTNode tableNode) throws Exception {
         // TODO: 类型检查
         // 获取表名
         ASTNode tabNameNode = getChild(tableNode, "TOK_TABNAME");
@@ -609,7 +611,7 @@ public class HQLFieldsConverter {
      * @param tableName 表名
      * @return 字段名，中途出现错误则将错误信息打印并返回 null
      */
-    private ArrayList<FieldInfo> getFieldsOfATable(String tableName){
+    private ArrayList<FieldInfo> getFieldsOfATable(String tableName) throws Exception {
         // TODO: 考虑表不存在的情况
         ArrayList<FieldInfo> fields = new ArrayList<FieldInfo>();
 
@@ -730,7 +732,7 @@ public class HQLFieldsConverter {
                 }
             }
             else{
-                System.err.println("Err: 找不到字段 (" + tableToFind.getAliasName().toString() + ") 所对应的依赖表");
+                System.err.println("Err: 找不到字段 (" + tableToFind.getAliasName() + ") 所对应的依赖表");
                 return null;
             }
         }
