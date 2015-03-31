@@ -15,11 +15,11 @@ import linc.fieldsconverter.HQLFieldsConverter;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.sql.ResultSet;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.ResourceBundle;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -34,15 +34,9 @@ public class RPCServer extends Thread{
     public QueueingConsumer.Delivery delivery;
     public java.sql.Connection con;
     public static int JDBCConnections;
-    private static final String conHost="127.0.0.1";
-    private static final String conUsername="guest";
-    private static final String conPassword="guest";
     private HQLFieldsConverter fieldsConverter;    // A converter used to convert the result of SQL command
-
-
-    static {
-        JDBCConnections = Integer.valueOf(ResourceBundle.getBundle("db").getString("JDBCConnections"));
-    }
+    public static String path;
+    private static HashMap<String,String> keyValueMap;      //配置文件的内容信息
 
     public RPCServer(QueueingConsumer.Delivery delivery,java.sql.Connection con){
         this.delivery = delivery;
@@ -77,7 +71,8 @@ public class RPCServer extends Thread{
      * @return json数据格式的数据
      */
     private String sqlExecute(String sql,java.sql.Connection con) {
-        this.fieldsConverter = new HQLFieldsConverter(con);
+
+        this.fieldsConverter = new HQLFieldsConverter(con);        //path为jar包当前路径
         ConnectJDBC conn = new ConnectJDBC();
         ResultSet rs = null;
         String response = null;
@@ -99,14 +94,14 @@ public class RPCServer extends Thread{
         JSONObject jsonObject;
         try {
             // jsonObject = conn.transformToJsonArray(rs);
-            jsonObject = conn.convertArrayListToJsonObject(result);
+            jsonObject = conn.convertArrayListToJsonObject(result,keyValueMap.get("logPath"));
             response = jsonObject.toString();
         } catch (Exception e) {
             // e.printStackTrace();
             String msg = e.getMessage();
             response = "{\"code\": \"10\",\"msg\": \"" + msg + "\"}";
         }finally{
-            JDBCUtils.releaseAll();
+        //    JDBCUtils.releaseAll();
         }
 
         System.out.println("222::"+response);
@@ -172,14 +167,20 @@ public class RPCServer extends Thread{
 
 
     public static void main(String[] args) {
+
+        Properties properties = System.getProperties();     //获取配置文件路径
+        path = properties.getProperty("user.dir");
+        System.out.println("path***=== " + path);
+        HashMap<String,String> keyValueMap = RPCServer.readConfFile(path);      //keyValueMap是配置文件的键值对
+        JDBCConnections = Integer.valueOf(keyValueMap.get("JDBCConnections"));
         ExecutorService pool=null;
         List<java.sql.Connection> connectionList = null;
         try {
             /* 设置消息队列监控连接 */
             factory = new ConnectionFactory();
-            factory.setHost(conHost);
-            factory.setUsername(conUsername);
-            factory.setPassword(conPassword);
+            factory.setHost(keyValueMap.get("conHost"));
+            factory.setUsername(keyValueMap.get("conUsername"));
+            factory.setPassword(keyValueMap.get("conPassword"));
 
             connection = factory.newConnection();
             channel = connection.createChannel();
@@ -199,13 +200,13 @@ public class RPCServer extends Thread{
             System.out.println(" Start Server: Monitor Queue");
 
             // 在创建JDBC连接之前注册driver
-            JDBCUtils.loadDriver();
+            JDBCUtils.loadDriver(keyValueMap.get("driverClass"));
 
             // 创建JDBCConnections个JDBC连接
             connectionList=new ArrayList<java.sql.Connection>();
             for(int ii=0;ii<JDBCConnections;ii++) {
                 JDBCUtils jd = new JDBCUtils();
-                java.sql.Connection con = jd.getConnection();
+                java.sql.Connection con = jd.getConnection(keyValueMap.get("url"),keyValueMap.get("username"),keyValueMap.get("password"));
                 connectionList.add(con);
             }
 
@@ -247,5 +248,28 @@ public class RPCServer extends Thread{
         }
     }
 
-
+    /**
+     * this method will read the confFile at the root directory
+     * @param path
+     * @return HashMap
+     * */
+    public static HashMap<String,String> readConfFile(String path){
+        try{
+            // path+"/RPCServerConf.properties"  "F:\\software\\IntelliJ IDEA\\IDEA Project\\ZTE_section2\\RPCServerConf.properties"
+            File file = new File(path+"/RPCServerConf.properties");
+            BufferedReader bfr = new BufferedReader(new FileReader(file));      //获取输入流
+            String lines;
+            keyValueMap = new HashMap<String, String>(9);
+            while((lines = bfr.readLine()) != null){
+                if(lines.startsWith("#")){
+                    continue;
+                }
+                String keyValuePair[] = lines.split("=");
+                keyValueMap.put(keyValuePair[0],keyValuePair[1]);
+            }}catch (Exception e){
+            System.out.println("系统配置文件读取错误");
+            System.out.println("path : "+path+"/RPCServerConf.properties");
+        }
+        return keyValueMap;
+    }
 }
