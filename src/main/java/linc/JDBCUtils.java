@@ -19,26 +19,25 @@ public class JDBCUtils {
      * 4、释放 conn
      * 5、释放 resultset
     **/
-    public static String driverClass;
+   /* public static String driverClass;
     public static String url;
     public static String username;
     public static String password;
-//    static Connection conn = null;
     static Statement stmt = null;
-    static ResultSet rs = null;
+    static ResultSet rs = null;*/
 
-    static{
+   /* static{
         driverClass = ResourceBundle.getBundle("db").getString("driverClass");
         url = ResourceBundle.getBundle("db").getString("url");
         username = ResourceBundle.getBundle("db").getString("username");
         password = ResourceBundle.getBundle("db").getString("password");
-    }
+    }*/
 
     /**
      * register the driver
      *
      * */
-    public static void loadDriver() {
+    public static void loadDriver(String driverClass) {
         try {
             System.out.println(Thread.currentThread().getName() + ": registering driver");
             Class.forName(driverClass);
@@ -53,14 +52,11 @@ public class JDBCUtils {
      * get the connection object
      * @return connection object
      * */
-    public  Connection getConnection(){
+    public  Connection getConnection(String url,String username,String password){
         Connection conn = null;
         try {
-//            if(conn == null){
-
                 System.out.println(Thread.currentThread().getName() + ": getting connection");
                 conn = DriverManager.getConnection(url, username, password);
-//            }
         } catch (SQLException e) {
             e.printStackTrace();
         }

@@ -44,13 +44,13 @@ public class GetSQLTimeAndInput {
                     if(line.contains("SparkListenerJobStart")) {
                         break;
                     }
-                    System.out.println(line);
+                  //  System.out.println(line);
                     nextEnd--;
                 }
                 nextEnd--;
                 rf.seek(nextEnd);
                 if(nextEnd == 0){//当文件指针退至文件开始处，输出第一行
-                    System.out.println(rf.readLine());
+                    //System.out.println(rf.readLine());
                 }
             }
         } catch (FileNotFoundException e) {

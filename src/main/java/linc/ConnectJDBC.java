@@ -15,8 +15,6 @@ import java.util.HashMap;
  * Created by admin on 2015/3/16.
  */
 public class ConnectJDBC {
-     // master节点上日志的路径：/tmp/spark-events/sparksql--master-1427427041872
-     private static final String PATH = "/Users/ihainan/tmp/sparksql--master-1427427041872/EVENT_LOG_1";      // path是spark SQL执行任务后日志的存放路径
      private String msg;
      private int code;
 
@@ -47,6 +45,7 @@ public class ConnectJDBC {
                 msg += msgArray[i];
             }
             code = 1 ;
+            System.out.println("msg:"+msg+code);
             throw new Exception(msg);
         }finally {
             JDBCUtils.releaseAll();
@@ -62,7 +61,7 @@ public class ConnectJDBC {
      * @param rs  the resultset
      * @return JSONArray
      * */
-    public  JSONObject transformToJsonArray(ResultSet rs) throws JSONException {
+   /* public  JSONObject transformToJsonArray(ResultSet rs) throws JSONException {
 
         JSONArray array = new JSONArray();              //建立jsonArray数组封装所有的resultset信息
         JSONObject wholeJsonObj = null;     //wholeArray封装所有包含时间，大小，返回码，返回信息的Json
@@ -90,7 +89,7 @@ public class ConnectJDBC {
         wholeJsonObj = new JSONObject();               //wholeJsonObj用于存放最终返回数据
 
         GetSQLTimeAndInput getSQLInfo = new GetSQLTimeAndInput();       //获取sqlJob的time和input,返回json数据
-        JSONArray sqlJobinfo = getSQLInfo.getLastJobInfo(PATH);     //获取job日志
+        JSONArray sqlJobinfo = getSQLInfo.getLastJobInfo(LOGPATH);     //获取job日志
         JSONObject timeAndInputInfo = getSQLInfo.getJobTimeAndInput(sqlJobinfo);        //从日志中解析出time和input返回json数据
         Object time = timeAndInputInfo.get("time");
         Object size = timeAndInputInfo.get("size");
@@ -102,14 +101,14 @@ public class ConnectJDBC {
             msg = "success";
         wholeJsonObj.put("result", array).put("time",time.toString()).put("size",size.toString()).put("code",code).put("msg",msg);
         return wholeJsonObj;
-    }
+    }*/
 
     /**
      * 将规则转换后的数据再次转换成 JSON Object
      * @param resultList
      * @return
      */
-    public JSONObject convertArrayListToJsonObject(ArrayList<ArrayList<String>> resultList) throws Exception {
+    public JSONObject convertArrayListToJsonObject(ArrayList<ArrayList<String>> resultList,final String logPath) throws Exception {
         JSONArray jsonArray = new JSONArray();
         for(ArrayList<String> dataRow: resultList){
             JSONObject jsonObj = new JSONObject();
@@ -154,7 +153,7 @@ public class ConnectJDBC {
         }
         try {
             GetSQLTimeAndInput getSQLInfo = new GetSQLTimeAndInput();       //获取sqlJob的time和input,返回json数据
-            JSONArray sqlJobInfo = getSQLInfo.getLastJobInfo(PATH);     //获取job日志
+            JSONArray sqlJobInfo = getSQLInfo.getLastJobInfo(logPath);     //获取job日志
             JSONObject timeAndInputInfo = getSQLInfo.getJobTimeAndInput(sqlJobInfo);        //从日志中解析出time和input返回json数据
             Object time = timeAndInputInfo.get("time");
             Object size = timeAndInputInfo.get("size");
