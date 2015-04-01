@@ -11,7 +11,7 @@ import java.util.ResourceBundle;
  */
 public class Rules {
     private ArrayList<Rule> allRules = new ArrayList<Rule>();
-    private static String ruleFilePath =RPCServer.path+"/rules";     // 规则文件存储路径，在 conf.properties 中指定
+    private static String ruleFilePath =RPCServer.path+"/rules";     // 规则文件存储路径
 
 
 
