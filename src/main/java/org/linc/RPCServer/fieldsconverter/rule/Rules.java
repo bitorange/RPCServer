@@ -1,17 +1,17 @@
 package org.linc.RPCServer.fieldsconverter.rule;
 
-import service.RPCServer;
+
 
 import java.io.*;
 import java.util.ArrayList;
-import java.util.ResourceBundle;
+import org.linc.RPCServer.*;
 
 /**
  * Created by ihainan on 3/20/15.
  */
 public class Rules {
     private ArrayList<Rule> allRules = new ArrayList<Rule>();
-    private static String ruleFilePath =RPCServer.path+"/rules";     // 规则文件存储路径
+    private static String ruleFilePath = ApplicationEntry.path + "/rules";     // 规则文件存储路径
 
 
 
@@ -28,7 +28,7 @@ public class Rules {
      */
     public Boolean readRules(String ruleFilePath){
         allRules = new ArrayList<Rule>();
-        System.out.print(RPCServer.path); //检测能不能传递过来
+        System.out.print(ApplicationEntry.path); //检测能不能传递过来
         // Open the file
         FileInputStream fstream = null;
         try {
