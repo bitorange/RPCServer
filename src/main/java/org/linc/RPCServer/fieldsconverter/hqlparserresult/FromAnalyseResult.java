@@ -1,7 +1,7 @@
-package linc.fieldsconverter.hqlparserresult;
+package org.linc.RPCServer.fieldsconverter.hqlparserresult;
 
 
-import linc.fieldsconverter.TableInfo;
+import org.linc.RPCServer.fieldsconverter.TableInfo;
 
 import java.util.ArrayList;
 

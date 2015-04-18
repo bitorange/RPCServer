@@ -1,4 +1,4 @@
-package linc.fieldsconverter;
+package org.linc.RPCServer.fieldsconverter;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;

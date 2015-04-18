@@ -1,4 +1,4 @@
-package linc.fieldsconverter;
+package org.linc.RPCServer.fieldsconverter;
 
 /**
  * Created by ihainan on 3/30/15.

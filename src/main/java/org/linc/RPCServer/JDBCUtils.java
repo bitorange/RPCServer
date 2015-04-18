@@ -1,4 +1,4 @@
-package linc;
+package org.linc.RPCServer;
 
 import java.sql.*;
 import java.util.ResourceBundle;

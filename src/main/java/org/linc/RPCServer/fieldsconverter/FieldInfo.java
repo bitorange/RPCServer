@@ -1,4 +1,4 @@
-package linc.fieldsconverter;
+package org.linc.RPCServer.fieldsconverter;
 
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 

@@ -1,6 +1,6 @@
-package linc.fieldsconverter.hqlparserresult;
+package org.linc.RPCServer.fieldsconverter.hqlparserresult;
 
-import linc.fieldsconverter.TableInfo;
+import org.linc.RPCServer.fieldsconverter.TableInfo;
 
 /**
  * Created by ihainan on 3/30/15.

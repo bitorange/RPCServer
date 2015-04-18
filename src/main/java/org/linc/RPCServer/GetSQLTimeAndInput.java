@@ -1,4 +1,4 @@
-package linc;
+package org.linc.RPCServer;
 
 import org.json.JSONArray;
 import org.json.JSONException;

@@ -1,4 +1,4 @@
-package linc.fieldsconverter;
+package org.linc.RPCServer.fieldsconverter;
 
 import java.util.ArrayList;
 import java.util.Date;

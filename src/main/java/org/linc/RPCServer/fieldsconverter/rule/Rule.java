@@ -1,4 +1,4 @@
-package linc.fieldsconverter.rule;
+package org.linc.RPCServer.fieldsconverter.rule;
 
 
 import java.util.regex.Matcher;

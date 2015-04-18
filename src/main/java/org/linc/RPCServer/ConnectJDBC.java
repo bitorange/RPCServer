@@ -1,4 +1,4 @@
-package linc;
+package org.linc.RPCServer;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -6,7 +6,6 @@ import org.json.JSONObject;
 
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 /**
  * this class is used to connect the jdbc and execute SQL command.

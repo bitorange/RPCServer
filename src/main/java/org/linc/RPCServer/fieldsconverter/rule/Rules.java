@@ -1,4 +1,4 @@
-package linc.fieldsconverter.rule;
+package org.linc.RPCServer.fieldsconverter.rule;
 
 import java.io.*;
 import java.util.ArrayList;
