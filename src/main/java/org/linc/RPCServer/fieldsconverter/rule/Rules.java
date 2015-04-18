@@ -1,5 +1,7 @@
 package org.linc.RPCServer.fieldsconverter.rule;
 
+import service.RPCServer;
+
 import java.io.*;
 import java.util.ArrayList;
 import java.util.ResourceBundle;
@@ -9,26 +11,24 @@ import java.util.ResourceBundle;
  */
 public class Rules {
     private ArrayList<Rule> allRules = new ArrayList<Rule>();
-    private static String ruleFilePath;     // 规则文件存储路径，在 conf.properties 中指定
+    private static String ruleFilePath =RPCServer.path+"/rules";     // 规则文件存储路径
 
-    static{
-        ruleFilePath = ResourceBundle.getBundle("conf").getString("rulesFile");
-    }
+
 
     /**
      * 构造函数，读取本地规则文件
      */
     public Rules(){
-        this.readRules();
+        this.readRules(ruleFilePath);
     }
 
     /**
      * 从本地文件中读取规则
      * @return true 表示读取成功，否则表示失败
      */
-    public Boolean readRules(){
+    public Boolean readRules(String ruleFilePath){
         allRules = new ArrayList<Rule>();
-
+        System.out.print(RPCServer.path); //检测能不能传递过来
         // Open the file
         FileInputStream fstream = null;
         try {
@@ -90,7 +90,7 @@ public class Rules {
      * @return
      */
     public Boolean addNewRule(Rule rule){
-        readRules();
+        readRules(ruleFilePath);
         if(!isExisted(rule)){
             allRules.add(rule);
 
