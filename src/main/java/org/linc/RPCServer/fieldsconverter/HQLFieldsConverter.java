@@ -903,7 +903,7 @@ public class HQLFieldsConverter {
                     while (resultSet.next()) {
                         ArrayList<String> resultOfOneRow = new ArrayList<String>();
                         for (int i = 1; i <= metaData.getColumnCount(); ++i) {
-                            resultOfOneRow.add(metaData.getColumnName(i) + resultSet.getString(i));
+                            resultOfOneRow.add(metaData.getColumnName(i) + "\t" + resultSet.getString(i));
                         }
                         finalResult.add(resultOfOneRow);
                     }
