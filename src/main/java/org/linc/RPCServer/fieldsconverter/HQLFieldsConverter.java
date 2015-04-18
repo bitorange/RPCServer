@@ -353,9 +353,8 @@ public class HQLFieldsConverter {
         return new InsertAnalyseResult(dependentTables, allSelectedFields, insertTables);
     }
 
-    // TODO: 扩展表达式列表
     // 表达式列表
-    private static final String[] OPERATIONS_LIST = {"+", "-", "x", "/"};
+    private static final String[] OPERATIONS_LIST = {"+", "-", "x", "/", "%", "&", "|", "^", "~"};
     private int innerFieldNumber = 0;
 
     // 获取函数或者表达式内部的所有字段以及字段来源表信息
