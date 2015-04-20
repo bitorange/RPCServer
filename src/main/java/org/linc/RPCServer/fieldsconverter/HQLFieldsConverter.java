@@ -2,6 +2,7 @@ package org.linc.RPCServer.fieldsconverter;
 
 import org.linc.RPCServer.ConnectJDBC;
 import org.linc.RPCServer.fieldsconverter.hqlparserresult.*;
+import org.linc.RPCServer.fieldsconverter.info.*;
 import org.linc.RPCServer.fieldsconverter.rule.*;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
@@ -17,20 +18,23 @@ import java.sql.SQLException;
 import java.util.*;
 
 /**
- * 用于解析 HQL 命令，以及进行字段转换
+ * 本类内部实现了字段规则转换算法，并对外提供字段转换接口
  *
  * @author ihainan
  * @version 1.1
  */
 public class HQLFieldsConverter {
     /**
-     * A hashmap used to store all the possible types of AST Nodes. *
+     * AST 节点值到 AST 节点名的映射
+     * <p> HiveParser 中使用整型数值来表示 AST 节点类型，本 HashMap 存储节点数值到节点名的映射关系 </p>
+     *
+     * @see org.apache.hadoop.hive.ql.parse.HiveParser
      */
-    private static HashMap<Integer, String> typeNames;
+    private static HashMap<Integer, String> typeValueToNames;
 
     static {
         try {
-            typeNames = getAllASNodeType();
+            typeValueToNames = getTypeValueToNamesHashMap();
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } catch (IllegalAccessException e) {
@@ -38,16 +42,30 @@ public class HQLFieldsConverter {
         }
     }
 
+    /**
+     * 到远程数据库的 JDBC 连接对象
+     * <p>该对象被用于解析 AST 时，可获得某数据库表的字段信息 </p>
+     */
     private java.sql.Connection con = null;
 
+    /**
+     * 类构造函数
+     *
+     * @param con 到远程数据库的 JDBC 连接对象
+     */
     public HQLFieldsConverter(java.sql.Connection con) {
         this.con = con;
     }
 
     /**
-     * Get all the possible types of AST nodes *
+     * 获取 typeValueToNames 哈希表
+     *
+     * @return typeValueToNames 哈希表
+     * @throws ClassNotFoundException Classpath 中找不到 org.apache.hadoop.hive.ql.parse.HiveParser 类
+     * @throws IllegalAccessException 不具备访问 org.apache.hadoop.hive.ql.parse.HiveParser 中某域的权限
+     * @see org.apache.hadoop.hive.ql.parse.HiveParser
      */
-    private static HashMap<Integer, String> getAllASNodeType() throws ClassNotFoundException, IllegalAccessException {
+    private static HashMap<Integer, String> getTypeValueToNamesHashMap() throws ClassNotFoundException, IllegalAccessException {
         HashMap<Integer, String> typeNames = new HashMap<Integer, String>();
         for (Field field : Class.forName("org.apache.hadoop.hive.ql.parse.HiveParser").getFields()) {
             if (Modifier.isFinal(field.getModifiers()) && field.getType() == int.class) {
@@ -57,10 +75,30 @@ public class HQLFieldsConverter {
         return typeNames;
     }
 
+    /**
+     * 根据 AST 节点类型值获取该节点的类型名
+     *
+     * @param typeInt AST 节点类型值
+     * @return 节点的类型名，如果 typeValueToNames 中不存在该类型，则返回 “OTHERS”
+     */
+    private static String getASTNodeType(int typeInt) {
+        if (typeValueToNames.containsKey(typeInt)) {
+            return typeValueToNames.get(typeInt);
+        } else {
+            return "OTHER";
+        }
+    }
+
+    /**
+     * printASTree 函数中遍历 AST 的最大深度
+     */
     private static final int MAX_DEPTH = 100;
 
     /**
-     * Print an AST tree *
+     * 使用 DFS 深度遍历并打印一棵 AST
+     *
+     * @param tree  需要遍历的 AST
+     * @param depth 打印的最大深度，大于该深度将不再往下
      */
     private static void printASTree(ASTNode tree, int depth) {
         if (depth > MAX_DEPTH)
@@ -79,22 +117,24 @@ public class HQLFieldsConverter {
     }
 
     /**
-     * Get the type of an AST Node *
+     * 用于存储某张结果表所直接依赖的数据表（FROM 从句后接的数据库表或者中间表）的信息
+     * <p>哈希表的 Key 由结果表调用 toString 方法得到 </p>
+     * <p>哈希表的 Value 为所有依赖表构成的列表 </p>
      */
-    private static String getASTNodeType(int typeInt) {
-        if (typeNames.containsKey(typeInt)) {
-            return typeNames.get(typeInt);
-        } else {
-            return "OTHER";
-        }
-    }
-
-    private HashMap<String, ArrayList<DependentTable>> dependenceOfTables = new HashMap<String, ArrayList<DependentTable>>();   // 用于存储某一张表所依赖的所有表的信息，信息包括依赖表表名、别名、字段列表，以及所依赖该依赖表的新字段列表
-    private Rules rules = new Rules();  // 用于存储和应用规则
+    private HashMap<String, ArrayList<DependentTable>> dependenceOfTables = new HashMap<String, ArrayList<DependentTable>>();
 
     /**
-     * Analyse QUERY clause
-     * Register the dependence info into DEPENDENCY table and return the info the new table
+     * 用于存储一个规则文件内的所有规则
+     */
+    private Rules rules = new Rules();
+
+    /**
+     * 分析 TOK_QUERY 节点
+     *
+     * @param node   需要分析的 AST_QUERY 节点
+     * @param isRoot 该 QUERY 是不是将生成最终的结果表，true 为是, false 为不是
+     * @return TOK_QUERY 节点分析得到的结果
+     * @see org.linc.RPCServer.fieldsconverter.hqlparserresult.QueryAnalyseResult
      */
     private QueryAnalyseResult queryAnalyse(ASTNode node, Boolean isRoot) throws Exception {
         /* 类型检查 */
@@ -141,11 +181,11 @@ public class HQLFieldsConverter {
     }
 
     /**
-     * 分析 INSERT 从句
+     * 分析 TOK_INSERT 节点
      *
-     * @param insertNode     需要分析，类型为 TOK_INSERT 的 AST Node
-     * @param fromTablesInfo fromAnalyse 分析得到的结果
-     * @return 分析结果，中途出现错误则将错误信息打印并返回 null
+     * @param insertNode     需要分析的 TOK_INSERT 节点
+     * @param fromTablesInfo 与 TOK_INSERT 同级 TOK_FROM 节点的分析结果
+     * @return TOK_INSERT 分析得到的结果
      */
     private InsertAnalyseResult insertAnalyse(ASTNode insertNode, ArrayList<TableInfo> fromTablesInfo) {
         /* 类型检查 */
@@ -170,7 +210,6 @@ public class HQLFieldsConverter {
         for (Node prNode : selectNode.getChildren()) {
             numOfColumns++;
 
-            // TODO: 错误检查
             ASTNode prChild = (ASTNode) ((ASTNode) prNode).getChild(0);
 
             // * 形式或者 Table.*
@@ -353,14 +392,27 @@ public class HQLFieldsConverter {
         return new InsertAnalyseResult(dependentTables, allSelectedFields, insertTables);
     }
 
-    // 表达式列表
+    /**
+     * HIVE SQL 所支持操作符的列表
+     */
     private static final String[] OPERATIONS_LIST = {"+", "-", "x", "/", "%", "&", "|", "^", "~"};
+
+    /**
+     * 计数器，用于在 getAllInnerFields 内统计已经遍历过的字段的数目
+     */
     private int innerFieldNumber = 0;
 
-    // 获取函数或者表达式内部的所有字段以及字段来源表信息
+    /**
+     * 获取函数或者表达式内部所有出现的字段，以及字段直接来源的数据表
+     *
+     * @param node                   需要分析的 AST 节点（对应函数或者表达式）
+     * @param oldDependentTables     所以依赖的数据表的信息，初始为空，不断更新
+     * @param fromTablesInfo         AST_FROM 节点分析得到的结果
+     * @param originalFieldAliasName 函数或者表达式的别名
+     * @return 函数或者表达式内部所有出现的字段，以及字段直接来源的数据表
+     */
     private ArrayList<DependentTable> getAllInnerFields(ASTNode node, ArrayList<DependentTable> oldDependentTables,
                                                         ArrayList<TableInfo> fromTablesInfo, String originalFieldAliasName) {
-        // ArrayList<DependentTable> newDependentTables = new ArrayList<DependentTable>();
         for (Node child : node.getChildren()) {
             ASTNode childAST = (ASTNode) child;
 
@@ -419,8 +471,6 @@ public class HQLFieldsConverter {
                     System.err.println("Err: 无法在来源表信息中找到相应的字段");
                     return null;
                 }
-            } else {
-                // System.err.println("Err: getAllInnerFields 中出现特殊节点 " + childAST.toString());
             }
         }
 
@@ -527,6 +577,9 @@ public class HQLFieldsConverter {
         return new FromAnalyseResult(fromTablesInfo);
     }
 
+    /**
+     * 所有类型的 JOIN 语句对应 AST 节点的类型名
+     */
     private final static String[] JOIN_TYPE = {"TOK_JOIN", "TOK_LEFTOUTERJOIN", "TOK_RIGHTOUTERJOIN", "TOK_FULLOUTERJOIN"};
 
     /**
@@ -545,10 +598,10 @@ public class HQLFieldsConverter {
     }
 
     /**
-     * 检查一个节点是否是 JOIN 类型节点
+     * 检查一个 AST 节点是否是 JOIN 类型节点
      *
-     * @param node 需要检查的节点
-     * @return 返回 true 说明是，否则不是
+     * @param node 需要检查的 AST 节点
+     * @return 返回 true 说明是 JOIN 类型节点，false 不是
      */
     public static Boolean checkIsJOINTypeNode(ASTNode node) {
         if (node == null) {
@@ -563,7 +616,7 @@ public class HQLFieldsConverter {
     }
 
     /**
-     * 获取某 AST Node 中类型为 fieldName 的子节点
+     * 获取某 AST Node 中首个类型为 fieldName 的子节点
      *
      * @param node      节点
      * @param fieldName 类型名
@@ -581,16 +634,13 @@ public class HQLFieldsConverter {
     }
 
     /**
-     * 根据节点信息，从数据库中获取一张表的相关信息
+     * 根据 AST 节点信息，获取对应数据表的相关信息
      *
-     * @param tableNode 需要获取信息的 TABLE 节点
-     * @return 表信息，包括：<br/>
-     * 1. 表名 <br/>
-     * 2. 别名 <br/>
-     * 3. 表中存在的字段 <br/>
+     * @param tableNode 需要查询的 AST 节点
+     * @return AST 节点对应数据库表的相关信息
+     * @throws Exception 从数据库中获取某数据表信息失败
      */
     private TableInfo getTableInfoOfNode(ASTNode tableNode) throws Exception {
-        // TODO: 类型检查
         // 获取表名
         ASTNode tabNameNode = getChild(tableNode, "TOK_TABNAME");
         String tableName = getChild(tabNameNode, "Identifier").toString();
@@ -608,41 +658,35 @@ public class HQLFieldsConverter {
     }
 
     /**
-     * 获取数据中某表的所有字段名
+     * 获取数据库中某表所包含的所有字段
      *
-     * @param tableName 表名
-     * @return 字段名，中途出现错误则将错误信息打印并返回 null
+     * @param tableName 需要查询的数据库表
+     * @return 数据库表的所有字段的信息
+     * @throws Exception 执行 SQL 语句失败
      */
     private ArrayList<FieldInfo> getFieldsOfATable(String tableName) throws Exception {
-        // TODO: 考虑表不存在的情况
         ArrayList<FieldInfo> fields = new ArrayList<FieldInfo>();
 
-        // TODO: 性能优化
         // Connect to Database
         ConnectJDBC connectJDBC = new ConnectJDBC();
         String command = "SELECT * FROM " + tableName;
-        ResultSet resultSet = connectJDBC.getAndExucuteSQL(command, this.con);
-        try {
-            ResultSetMetaData metaData = resultSet.getMetaData();
-            for (int i = 1; i <= metaData.getColumnCount(); ++i) {
-                String columnName = metaData.getColumnName(i);
-                fields.add(new FieldInfo(columnName, null, null));  // 对于数据库中的表，在 AST 中没有对应的节点
-            }
-        } catch (SQLException e) {
-            System.err.println("Err: 获取 metaData 失败");
-            return null;
+        ResultSet resultSet = connectJDBC.getAndExecuteSQL(command, this.con);
+        ResultSetMetaData metaData = resultSet.getMetaData();
+        for (int i = 1; i <= metaData.getColumnCount(); ++i) {
+            String columnName = metaData.getColumnName(i);
+            fields.add(new FieldInfo(columnName, null, null));  // 对于数据库中的表，在 AST 中没有对应的节点
         }
-
         return fields;
     }
 
 
     /**
+     * 添加一个字段到一张 OriginalDependentTable 列表中
      *
-     * @param dependentOriginalTables
-     * @param tableInfo
-     * @param fieldName
-     * @return
+     * @param dependentOriginalTables 需要添加字段的 OriginalDependentTable 列表
+     * @param tableInfo               该字段所归属的数据表的相关信息
+     * @param fieldName               需要添加字段的字段名
+     * @return 添加字段成功后的 OriginalDependentTable 列表
      */
     public ArrayList<OriginalDependentTable> addFieldIntoOriginalDependentTables(ArrayList<OriginalDependentTable> dependentOriginalTables,
                                                                                  TableInfo tableInfo, String fieldName) {
@@ -666,19 +710,25 @@ public class HQLFieldsConverter {
         return dependentOriginalTables;
     }
 
+    /**
+     * 使用 BFS 生成一张 OriginalDependentTable 列表，该列表存储结果表中字段所最终依赖的数据库表的信息
+     *
+     * @param item 封装最终结果表信息的队列单元
+     * @return 存储结果表中字段所最终依赖的数据库表的信息的 OriginalDependentTable 列表
+     */
     private ArrayList<OriginalDependentTable> getOriginalDependentTables(QueueItem item) {
         ArrayList<OriginalDependentTable> originalDependentTables = new ArrayList<OriginalDependentTable>();
 
 
         // 初始化队列
-        Queue queue = new LinkedList();
+        Queue<QueueItem> queue = new LinkedList<QueueItem>();
         queue.add(item);
 
         // 开始寻找原始表
         DependentTable dependentTableToFind;
         while (queue.size() != 0) {
             // 从队列中取出需要寻找的字段和将要进行遍历的的依赖表 Key（表名 + "," + 别名）
-            item = (QueueItem) queue.remove();
+            item = queue.remove();
             FieldInfo fieldToFind = item.getFieldToFind();
             TableInfo tableToFind = item.getTableToFind();
 
@@ -699,7 +749,6 @@ public class HQLFieldsConverter {
                     // UNKNOWN_TABLE 只是一个伪表，需要进一步得到真实依赖的表
                     int columnNum = 0;
 
-                    // TODO: 复杂化 Field_Alias，避免冲突
                     // 找出依赖表
                     FieldInfo realFieldToFind = new FieldInfo(fieldToFind.getFiledName() + "_" + columnNum, fieldToFind.getFiledName() + "_" + columnNum, null);
                     DependentTable realDependentTableToFind = findTable(realFieldToFind,
@@ -741,47 +790,6 @@ public class HQLFieldsConverter {
     }
 
     /**
-     * 找出一条 SQL 查询语句中，某个 SELECT 字段依赖的表，该表必须存在于数据库中，而不是是中间生成的表
-     *
-     * @param field 需要查询的字段
-     * @return 最终所有依赖的表的列表
-     */
-    private ArrayList<DependentTable> getOriginalTables(FieldInfo field) {
-        ArrayList<DependentTable> originalTables = new ArrayList<DependentTable>();
-
-        // 目前仅考虑 Filed 不包含表达式、函数的情况，但留扩展接口
-        String tableName = TableInfo.FINAL_TABLE;
-        String alias = TableInfo.FINAL_TABLE;
-        DependentTable dependentTableToFind = null;
-
-        while (dependenceOfTables.containsKey(tableName + ", " + alias)) {
-            // 如果 Field 为表达式，此处可以得到多张 table
-            dependentTableToFind = findTable(field, tableName, alias);
-            if (dependentTableToFind == null) {
-                break;
-            }
-
-            // 如果是 TABLE_UNKNOWN，获取所有 c_x_y 的表与字段
-            // 判断 (dependentTableToFind.tableName + ", " + dependentTableToFind.alias) 是否存在于 dependenceOfTables，不存在，将 dependentTableToFind 放入 originalTables 中
-            // 否则，将 Field 和 dependentTableToFind 放入队列中
-            // 如果不是，将 Field 和 dependentTableToFind 放入队列中
-
-            field = dependentTableToFind.findField(field.getFiledName());
-            tableName = dependentTableToFind.getTableInfo().getTableName();
-            alias = dependentTableToFind.getTableInfo().getAliasName();
-        }
-
-        if (dependentTableToFind == null) {
-            System.err.println("Err: 找不到字段 (" + field.toString() + ") 所对应的依赖表");
-            return null;
-        } else {
-            originalTables.add(dependentTableToFind);
-        }
-
-        return originalTables;
-    }
-
-    /**
      * 在 dependenceOfTables ，某表的依赖列表中寻找包含某特定 field 的表
      *
      * @param field     需要查询的 field
@@ -805,9 +813,17 @@ public class HQLFieldsConverter {
      *
      * @param command   需要执行的命令
      * @param resultSet 执行 SQL 语句得到的结果
-     * @return 转换后的结果，中途出现错误输出错误并返回 null:<br/>
-     * 1. Key: 字段名 <br/>
-     * 2. Value: 转换后的值
+     * @return 转换后的结果，中途出现错误输出错误并返回 null
+     */
+
+    /**
+     * 解析 SQL 命令，对 SQL 命令所得到的结果集应用规则
+     *
+     * @param command   需要解析的 SQL 命令
+     * @param resultSet 执行 SQL 命令得到结果集
+     * @return 应用规则后的结果
+     * <p>每个 ArrayList<String> 表示结果集中的一条记录经过转换得到的结果 </p>
+     * <p>每个 String 表示该记录中，某个字段的值，格式为： 字段名 + "\t" + 转换得到的新值 </p>
      */
     public ArrayList<ArrayList<String>> parseCommand(String command, ResultSet resultSet) {
         ArrayList<ArrayList<String>> finalResult = new ArrayList<ArrayList<String>>();

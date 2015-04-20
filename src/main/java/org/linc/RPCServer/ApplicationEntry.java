@@ -54,8 +54,8 @@ public class ApplicationEntry extends Thread {
      *
      * @param name     用户名
      * @param password 密码
-     * @param con      JDBC连接
-     * @return json数据，msg：ok代表登录成功，msg：no代表登录失败，msg：其它代表错误
+     * @param con      到远程服务器的 JDBC 连接
+     * @return JSON 数据格式的返回数据，msg：ok 代表登录成功，msg：no 代表登录失败，msg：其它代表错误
      */
     private String check(String name, String password, java.sql.Connection con) {
         String result = AccountCheck.checkAccount(name, password, con);
@@ -66,8 +66,8 @@ public class ApplicationEntry extends Thread {
      * 对SQL语句进行执行并返回结果
      *
      * @param sql SQL语句
-     * @param con JDBC连接
-     * @return json数据格式的数据
+     * @param con 到远程服务器的 JDBC 连接
+     * @return JSON 数据格式的返回数据
      */
     private String sqlExecute(String sql, java.sql.Connection con) {
 
@@ -77,7 +77,7 @@ public class ApplicationEntry extends Thread {
         String response = null;
         ArrayList<ArrayList<String>> result = null;
         try {
-            rs = conn.getAndExucuteSQL(sql, con);
+            rs = conn.getAndExecuteSQL(sql, con);
             result = fieldsConverter.parseCommand(sql, rs);
             if (result == null) {
                 throw new Exception("字段转换发生错误");
@@ -111,7 +111,7 @@ public class ApplicationEntry extends Thread {
      * 获取从服务器消息队列中得到的消息信息，处理并向返回消息队列中返回消息
      *
      * @param delivery 消息队列中的一个消息
-     * @param con      JDBC连接
+     * @param con      到远程服务器的 JDBC 连接
      */
     public void connectToHive(QueueingConsumer.Delivery delivery, java.sql.Connection con) {
 
@@ -251,7 +251,7 @@ public class ApplicationEntry extends Thread {
     }
 
     /**
-     * this method will read the confFile at the root directory
+     * 在当前目录读取 RPCServerConf.properties 配置文件
      *
      * @param path 配置文件所在的目录路径
      * @return HashMap 配置文件中存储的配置信息，以键值对表示

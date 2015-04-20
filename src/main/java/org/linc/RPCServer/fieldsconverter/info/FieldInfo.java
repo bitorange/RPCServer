@@ -1,13 +1,14 @@
-package org.linc.RPCServer.fieldsconverter;
+package org.linc.RPCServer.fieldsconverter.info;
 
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 
 /**
- * Created by ihainan on 3/27/15.
+ * 表示一个字段内包含的信息
  */
 public class FieldInfo {
     /**
      * 获取字段名
+     *
      * @return 字段名
      */
     public String getFiledName() {
@@ -16,6 +17,7 @@ public class FieldInfo {
 
     /**
      * 获取字段别名
+     *
      * @return 字段别名
      */
     public String getFieldAlias() {
@@ -28,8 +30,10 @@ public class FieldInfo {
 
     /**
      * 构造函数
+     *
      * @param fieldName  字段名
      * @param fieldAlias 字段别名
+     * @param fieldNode  字段对应在 AST 中的节点
      */
     public FieldInfo(String fieldName, String fieldAlias, ASTNode fieldNode) {
         this.fieldAlias = fieldAlias;
@@ -38,8 +42,9 @@ public class FieldInfo {
     }
 
     /**
-     * 获取 Field 对应在 AST 中的节点
-     * @return 节点
+     * 获取字段对应在 AST 中的节点
+     *
+     * @return 字段对应的 AST 节点
      */
     public ASTNode getFieldNode() {
         return fieldNode;
@@ -47,7 +52,8 @@ public class FieldInfo {
 
     /**
      * 输出字段
-     * @return 输出的字符串
+     *
+     * @return 字段名 + ", " + 字段别名
      */
     @Override
     public String toString() {
@@ -55,9 +61,10 @@ public class FieldInfo {
     }
 
     /**
-     * 比较两个字段是否相同
+     * 比较两个字段是否为同一字段
+     *
      * @param fieldInfoObj 需要比较的对象
-     * @return true 表示相等，否则不等
+     * @return true 表示相等，false 表示不相等
      */
     @Override
     public boolean equals(Object fieldInfoObj) {

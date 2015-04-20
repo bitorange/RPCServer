@@ -1,11 +1,12 @@
-package org.linc.RPCServer.fieldsconverter;
+package org.linc.RPCServer.fieldsconverter.info;
 
 /**
- * Created by ihainan on 3/30/15.
+ * BFS 搜索时候，所维护队列中的成员
  */
 public class QueueItem {
     /**
      * 需要继续搜索的表
+     *
      * @return 需要继续搜索的表
      */
     public TableInfo getTableToFind() {
@@ -14,6 +15,7 @@ public class QueueItem {
 
     /**
      * 需要继续寻找的字段
+     *
      * @return 需要继续寻找的字段
      */
     public FieldInfo getFieldToFind() {
@@ -23,7 +25,7 @@ public class QueueItem {
     private TableInfo tableToFind;
     private FieldInfo fieldToFind;
 
-    public QueueItem(TableInfo tableToFind, FieldInfo fieldToFind){
+    public QueueItem(TableInfo tableToFind, FieldInfo fieldToFind) {
         this.tableToFind = tableToFind;
         this.fieldToFind = fieldToFind;
     }
