@@ -3,6 +3,7 @@ package org.linc.RPCServer.fieldsconverter.rule;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Iterator;
 
 import org.linc.RPCServer.*;
 
@@ -89,25 +90,66 @@ public class Rules {
      *
      * @param rule 需要添加的新规则
      * @return 是否添加成功，true 表示成功，false 表示失败
+     * @throws IOException 写入规则文件失败
      */
-    public Boolean addNewRule(Rule rule) {
+    public void addNewRule(Rule rule) throws IOException {
         readRules(ruleFilePath);
         if (!isExisted(rule)) {
             allRules.add(rule);
+            updateRulesFile(allRules);
+        }
+    }
 
-            // 写入文件
-            try {
-                Writer output = new BufferedWriter(new FileWriter(ruleFilePath, true));
-                output.append(rule.toString());
-                output.close();
-            } catch (IOException e) {
-                System.err.println("Err: 打开文件失败");
-                return false;
+    /**
+     * 删除指定规则
+     *
+     * @param rule 需要删除的规则
+     * @throws IOException 写入规则文件失败
+     */
+    public void deleteRule(Rule rule) throws IOException {
+        int i = 0;
+        for (; i < allRules.size(); ++i) {
+            if (rule.toString().equals(allRules.get(i).toString())) {
+                break;
             }
-
         }
 
-        return true;
+        if (i != allRules.size()) {
+            allRules.remove(i);
+            updateRulesFile(allRules);
+        }
+    }
+
+
+    /**
+     * 删除指定表的所有规则
+     * @param tableName 需要删除规则的表
+     * @throws IOException 写入规则文件失败
+     */
+    public void deleteRulesOfATable(String tableName) throws IOException {
+        Iterator<Rule> iterable = allRules.iterator();
+        while (iterable.hasNext()) {
+            Rule rule = iterable.next();
+            if(rule.getTableName().equals(tableName)){
+                iterable.remove();
+            }
+        }
+
+        updateRulesFile(allRules);
+    }
+
+    /**
+     * 更新规则文件
+     *
+     * @param newRules 需要写入的规则列表
+     * @throws IOException 写入规则文件失败
+     */
+    public void updateRulesFile(ArrayList<Rule> newRules) throws IOException {
+        Writer output = new BufferedWriter(new FileWriter(ruleFilePath, false));
+        for (Rule rule : newRules) {
+            output.append(rule.toString() + "\n");
+        }
+        output.close();
     }
 
     /**

@@ -933,7 +933,59 @@ public class HQLFieldsConverter {
                     }
                 }
             } else {
-                if (resultSet != null) {
+                // ONLY FOR TOK_CREATETABLE
+                if (getChild(tree, "TOK_CREATETABLE") != null){
+                    // 获取新表的表名
+                    ASTNode newTableNode = (ASTNode)getChild(getChild(getChild(tree, "TOK_CREATETABLE"), "TOK_TABNAME"), "Identifier");
+                    String newTableName = newTableNode.toString();
+
+                    // 获取字段，与 TOK_QUERY 相同
+                    ASTNode queryNode = (ASTNode) getChild(getChild(tree, "TOK_CREATETABLE"), "TOK_QUERY");
+                    dependenceOfTables = new HashMap<String, ArrayList<DependentTable>>();
+
+                    // 分析 TOK_QUERY，得到结果
+                    QueryAnalyseResult queryAnalyseResult = queryAnalyse(queryNode, true);
+                    if (queryAnalyseResult == null) {
+                        System.err.println("Err: 解析失败");
+                        return null;
+                    }
+
+                    TableInfo finalTableInfo = queryAnalyseResult.getTableInfo();   // 最终结果表的相关信息
+
+                    // 获取所有字段对应的原始表以及原始表中的字段
+                    ArrayList<OriginalDependentTables> allOriginalDependentTables = new ArrayList<OriginalDependentTables>();
+                    for (int i = 0; i < finalTableInfo.getFields().size(); ++i) {
+                        // 获取原始表和字段
+                        FieldInfo field = finalTableInfo.getFields().get(i);    // SELECT 第 i 个字段
+                        OriginalDependentTables originalDependentTables = getOriginalDependentTables(new QueueItem(finalTableInfo, field));   // 该字段依赖的表(s)和表中的原始字段
+                        allOriginalDependentTables.add(originalDependentTables);
+
+                        for (OriginalDependentTable originalDependentTable : originalDependentTables.getOriginalDependentTableArrayList()) {
+                            String selectedTable = originalDependentTable.getTableInfo().getTableName();
+                            // 对于原始表中的每一个依赖的字段
+                            for (String selectedField : originalDependentTable.getFields()) {
+                                // 检测是否存在对应规则
+                                Rule rule = rules.findRule(selectedTable, selectedField);
+                                // 存在规则
+                                if (rule != null) {
+                                    // 添加规则
+                                    Rule newRule = new Rule(newTableName,
+                                            field.getFiledName(), rule.getRex(), rule.getReplaceContent());
+                                    rules.addNewRule(newRule);
+                                }
+                            }
+                        }
+                    }
+                }
+                // ONLY FOR TOK_DROPTABLE
+                else if(getChild(tree, "TOK_DROPTABLE") != null){
+                    ASTNode droppedTableNode = (ASTNode)getChild(getChild(getChild(tree, "TOK_DROPTABLE"), "TOK_TABNAME"), "Identifier");
+                    String droppedTableName = droppedTableNode.toString();
+
+                    // 删除规则
+                    rules.deleteRulesOfATable(droppedTableName);
+                }
+                else if (resultSet != null) {
                     ResultSetMetaData metaData = resultSet.getMetaData();
                     while (resultSet.next()) {
                         ArrayList<String> resultOfOneRow = new ArrayList<String>();
