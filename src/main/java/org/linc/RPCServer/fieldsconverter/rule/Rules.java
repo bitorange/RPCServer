@@ -11,7 +11,7 @@ import org.linc.RPCServer.*;
  */
 public class Rules {
     private ArrayList<Rule> allRules = new ArrayList<Rule>();
-    private static String ruleFilePath = ApplicationEntry.path + "/rules";     // 规则文件存储路径
+    private static String ruleFilePath = GlobalVar.configMap.get("rules.path");     // 规则文件存储路径
 
 
     /**
@@ -27,10 +27,8 @@ public class Rules {
      * @return true 表示读取成功， false 表示读取失败
      */
     public Boolean readRules(String ruleFilePath) {
-        // ruleFilePath = "/Users/ihainan/tmp/rules";
-
         allRules = new ArrayList<Rule>();
-        System.out.print(ApplicationEntry.path); //检测能不能传递过来
+
         // Open the file
         FileInputStream fstream;
         try {

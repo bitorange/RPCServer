@@ -8,14 +8,9 @@ import com.rabbitmq.client.QueueingConsumer;
 import org.json.JSONObject;
 import org.linc.RPCServer.fieldsconverter.HQLFieldsConverter;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
 import java.sql.ResultSet;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -23,18 +18,30 @@ import java.util.concurrent.Executors;
  * 程序入口
  */
 public class ApplicationEntry extends Thread {
+    /* RPC Server 相关 */
+    private static final String RPC_QUEUE_NAME = "rpc_queue";   // RPC 队列名
+    private static String conHost = "localhost";    // RabbitMQ Server 地址
+    private static String conUsername = "guest";    // RabbitMQ Server 用户名
+    private static String conPassword = "guest";    // RabbitMQ Server 密码
+    private static ConnectionFactory factory;
+    private static Connection connection = null;
+    private static Channel channel = null;
+    private static QueueingConsumer consumer;
+    private QueueingConsumer.Delivery delivery;
 
-    private static final String RPC_QUEUE_NAME = "rpc_queue";
-    public static ConnectionFactory factory;
-    public static Connection connection = null;
-    public static Channel channel = null;
-    public static QueueingConsumer consumer;
-    public QueueingConsumer.Delivery delivery;
-    public java.sql.Connection con;
-    public static int JDBCConnections;
-    private HQLFieldsConverter fieldsConverter;    // A converter used to convert the result of SQL command
-    public static String path;
-    private static HashMap<String, String> keyValueMap;      //配置文件的内容信息
+    /* JDBC 连接相关 */
+    private java.sql.Connection con;    // JDBC 连接
+    private static int JDBCConnections; // JDBC 连接数
+    private static String JDBCDriver;   // JDBC 驱动
+    private static String dbHost;       // 数据库地址
+    private static String dbUsername;   // 数据库用户名
+    private static String dbPassword;   // 数据库密码
+
+    /* 字段转换相关 */
+    private HQLFieldsConverter fieldsConverter;    // HQL 字段转换器
+
+    /* Spark 相关 */
+    private static String sparkLogPath; // Spark 日志路径
 
     public ApplicationEntry(QueueingConsumer.Delivery delivery, java.sql.Connection con) {
         this.delivery = delivery;
@@ -71,11 +78,11 @@ public class ApplicationEntry extends Thread {
      */
     private String sqlExecute(String sql, java.sql.Connection con) {
 
-        this.fieldsConverter = new HQLFieldsConverter(con);        // path为 jar 包当前路径
+        this.fieldsConverter = new HQLFieldsConverter(con);        // path 为 jar 包当前路径
         ConnectJDBC conn = new ConnectJDBC();
         ResultSet rs;
         String response = null;
-        ArrayList<ArrayList<String>> result = null;
+        ArrayList<ArrayList<String>> result;
         try {
             rs = conn.getAndExecuteSQL(sql, con);
             result = fieldsConverter.parseCommand(sql, rs);
@@ -93,7 +100,7 @@ public class ApplicationEntry extends Thread {
         JSONObject jsonObject;
         try {
             // jsonObject = conn.transformToJsonArray(rs);
-            jsonObject = conn.convertArrayListToJsonObject(result, keyValueMap.get("logPath"));
+            jsonObject = conn.convertArrayListToJsonObject(result, ApplicationEntry.sparkLogPath);
             response = jsonObject.toString();
         } catch (Exception e) {
             // e.printStackTrace();
@@ -166,26 +173,48 @@ public class ApplicationEntry extends Thread {
     }
 
     /**
+     * 解析程序运行参数，读取配置文件
+     *
+     * @param args 程序参数
+     */
+    private static void readConfigureFile(String[] args) {
+        // 解析参数，读取配置文件
+        GlobalVar.parseArgs(args);
+
+        /* RPC 相关参数 */
+        ApplicationEntry.conHost = GlobalVar.configMap.get("rpc.server");
+        ApplicationEntry.conUsername = GlobalVar.configMap.get("rpc.username");
+        ApplicationEntry.conPassword = GlobalVar.configMap.get("rpc.password");
+
+        /* JDBC 相关参数 */
+        ApplicationEntry.JDBCDriver = GlobalVar.configMap.get("db.driver");
+        ApplicationEntry.JDBCConnections = Integer.valueOf(GlobalVar.configMap.get("db.jdbc.connections"));
+        ApplicationEntry.dbHost = GlobalVar.configMap.get("db.url");
+        ApplicationEntry.dbUsername = GlobalVar.configMap.get("db.username");
+        ApplicationEntry.dbPassword = GlobalVar.configMap.get("db.password");
+
+        /* Spark 相关 */
+        ApplicationEntry.sparkLogPath = GlobalVar.configMap.get("spark.log.path");
+    }
+
+    /**
      * 主函数
      *
      * @param args 程序参数
      */
     public static void main(String[] args) {
-        /* 初始化 */
-        Properties properties = System.getProperties(); // 获取配置文件路径
-        path = properties.getProperty("user.dir");
-        System.out.println("path***=== " + path);
-        HashMap<String, String> keyValueMap = ApplicationEntry.readConfFile(path);  // keyValueMap 是配置文件的键值对
-        JDBCConnections = Integer.valueOf(keyValueMap.get("JDBCConnections"));
+        // 解析程序运行参数，读取配置文件
+        ApplicationEntry.readConfigureFile(args);
+
         ExecutorService pool = null;
         List<java.sql.Connection> connectionList = null;
 
         /* 设置消息队列监控连接 */
         try {
             factory = new ConnectionFactory();
-            factory.setHost(keyValueMap.get("conHost"));
-            factory.setUsername(keyValueMap.get("conUsername"));
-            factory.setPassword(keyValueMap.get("conPassword"));
+            factory.setHost(ApplicationEntry.conHost);
+            factory.setUsername(ApplicationEntry.conUsername);
+            factory.setPassword(ApplicationEntry.conPassword);
 
             connection = factory.newConnection();
             channel = connection.createChannel();
@@ -205,13 +234,14 @@ public class ApplicationEntry extends Thread {
             System.out.println(" Start Server: Monitor Queue");
 
             // 在创建JDBC连接之前注册driver
-            JDBCUtils.loadDriver(keyValueMap.get("driverClass"));
+            JDBCUtils.loadDriver(ApplicationEntry.JDBCDriver);
 
             // 创建JDBCConnections个JDBC连接
             connectionList = new ArrayList<java.sql.Connection>();
             for (int ii = 0; ii < JDBCConnections; ii++) {
                 JDBCUtils jd = new JDBCUtils();
-                java.sql.Connection con = jd.getConnection(keyValueMap.get("url"), keyValueMap.get("username"), keyValueMap.get("password"));
+                java.sql.Connection con = jd.getConnection(ApplicationEntry.dbHost,
+                        ApplicationEntry.dbUsername, ApplicationEntry.dbPassword);
                 connectionList.add(con);
             }
 
@@ -248,31 +278,5 @@ public class ApplicationEntry extends Thread {
                 }
             }
         }
-    }
-
-    /**
-     * 在当前目录读取 RPCServerConf.properties 配置文件
-     *
-     * @param path 配置文件所在的目录路径
-     * @return HashMap 配置文件中存储的配置信息，以键值对表示
-     */
-    public static HashMap<String, String> readConfFile(String path) {
-        try {
-            File file = new File(path + "/RPCServerConf.properties");
-            BufferedReader bfr = new BufferedReader(new FileReader(file));      // 获取输入流
-            String lines;
-            keyValueMap = new HashMap<String, String>(9);
-            while ((lines = bfr.readLine()) != null) {
-                if (lines.startsWith("#")) {
-                    continue;
-                }
-                String keyValuePair[] = lines.split("=");
-                keyValueMap.put(keyValuePair[0], keyValuePair[1]);
-            }
-        } catch (Exception e) {
-            System.out.println("系统配置文件读取错误");
-            System.out.println("path : " + path + "/RPCServerConf.properties");
-        }
-        return keyValueMap;
     }
 }
