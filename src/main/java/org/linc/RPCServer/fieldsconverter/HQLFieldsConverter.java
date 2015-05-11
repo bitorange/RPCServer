@@ -1,5 +1,6 @@
 package org.linc.RPCServer.fieldsconverter;
 
+import org.apache.commons.lang.StringUtils;
 import org.linc.RPCServer.ConnectJDBC;
 import org.linc.RPCServer.fieldsconverter.hqlparserresult.*;
 import org.linc.RPCServer.fieldsconverter.info.*;
@@ -716,9 +717,9 @@ public class HQLFieldsConverter {
      * @param item 封装最终结果表信息的队列单元
      * @return 存储结果表中字段所最终依赖的数据库表的信息的 OriginalDependentTable 列表
      */
-    private ArrayList<OriginalDependentTable> getOriginalDependentTables(QueueItem item) {
-        ArrayList<OriginalDependentTable> originalDependentTables = new ArrayList<OriginalDependentTable>();
-
+    private OriginalDependentTables getOriginalDependentTables(QueueItem item) {
+        ArrayList<OriginalDependentTable> originalDependentTableList = new ArrayList<OriginalDependentTable>();
+        boolean isIncludeFunctionOrExpression = false;
 
         // 初始化队列
         Queue<QueueItem> queue = new LinkedList<QueueItem>();
@@ -746,6 +747,9 @@ public class HQLFieldsConverter {
                 // TABLE_NULL，说明为函数或者表达式，需要单独处理
                 if (TableInfo.UNKNOWN_TABLE.equals(dependentTableInfo.getTableName())
                         && TableInfo.UNKNOWN_TABLE_ALIAS.equals(dependentTableInfo.getAliasName())) {
+                    // 登记
+                    isIncludeFunctionOrExpression = true;
+
                     // UNKNOWN_TABLE 只是一个伪表，需要进一步得到真实依赖的表
                     int columnNum = 0;
 
@@ -756,7 +760,7 @@ public class HQLFieldsConverter {
                     while (realDependentTableToFind != null) {
                         // 找出相应依赖字段
                         FieldInfo originalField = realDependentTableToFind.findField(realFieldToFind.getFiledName());
-                        originalDependentTables = this.addFieldIntoOriginalDependentTables(originalDependentTables, realDependentTableToFind.getTableInfo(), originalField.getFiledName());
+                        originalDependentTableList = this.addFieldIntoOriginalDependentTables(originalDependentTableList, realDependentTableToFind.getTableInfo(), originalField.getFiledName());
 
                         // 循环，直到找不到依赖表
                         columnNum++;
@@ -772,7 +776,7 @@ public class HQLFieldsConverter {
                     if (!dependenceOfTables.containsKey(tableName + ", " + aliasName)) {
                         // 获取原始字段名，保存
                         FieldInfo originalField = dependentTableToFind.findField(fieldToFind.getFiledName());
-                        originalDependentTables = this.addFieldIntoOriginalDependentTables(originalDependentTables, dependentTableInfo, originalField.getFiledName());
+                        originalDependentTableList = this.addFieldIntoOriginalDependentTables(originalDependentTableList, dependentTableInfo, originalField.getFiledName());
                     } else {
                         // 否则，放入队列
                         FieldInfo originalField = dependentTableToFind.findField(fieldToFind.getFiledName());
@@ -786,7 +790,7 @@ public class HQLFieldsConverter {
             }
         }
 
-        return originalDependentTables;
+        return new OriginalDependentTables(originalDependentTableList, isIncludeFunctionOrExpression);
     }
 
     /**
@@ -848,15 +852,16 @@ public class HQLFieldsConverter {
                     System.err.println("Err: 解析失败");
                     return null;
                 }
-                TableInfo finalTableInfo = queryAnalyseResult.getTableInfo();
-                InsertAnalyseResult insertAnalyseResult = queryAnalyseResult.getInsertAnalyseResult();
+
+                TableInfo finalTableInfo = queryAnalyseResult.getTableInfo();   // 最终结果表的相关信息
+                InsertAnalyseResult insertAnalyseResult = queryAnalyseResult.getInsertAnalyseResult();  // INSERT TOK 节点的分析结果
 
                 // 获取所有字段对应的原始表以及原始表中的字段
-                ArrayList<ArrayList<OriginalDependentTable>> allOriginalDependentTables = new ArrayList<ArrayList<OriginalDependentTable>>();
+                ArrayList<OriginalDependentTables> allOriginalDependentTables = new ArrayList<OriginalDependentTables>();
                 for (int i = 0; i < finalTableInfo.getFields().size(); ++i) {
                     // 获取原始表和字段
                     FieldInfo field = finalTableInfo.getFields().get(i);    // SELECT 第 i 个字段
-                    ArrayList<OriginalDependentTable> originalDependentTables = getOriginalDependentTables(new QueueItem(finalTableInfo, field));   // 该字段依赖的表(s)和表中的原始字段
+                    OriginalDependentTables originalDependentTables = getOriginalDependentTables(new QueueItem(finalTableInfo, field));   // 该字段依赖的表(s)和表中的原始字段
                     allOriginalDependentTables.add(originalDependentTables);
 
                     // 存在 SELECT 字段和 INSERT INTO / OVERWRITE 字段，需要继承规则
@@ -865,7 +870,7 @@ public class HQLFieldsConverter {
                         ArrayList<FieldInfo> fieldsToInsert = getFieldsOfATable(insertAnalyseResult.getInsertTables().get(0));  // 只可能 Insert 一张表，所以取 0，获取该表的字段名
 
                         // 对于没一个依赖的(原始)表
-                        for (OriginalDependentTable originalDependentTable : originalDependentTables) {
+                        for (OriginalDependentTable originalDependentTable : originalDependentTables.getOriginalDependentTableArrayList()) {
                             String selectedTable = originalDependentTable.getTableInfo().getTableName();
                             // 对于原始表中的每一个依赖的字段
                             for (String selectedField : originalDependentTable.getFields()) {
@@ -892,19 +897,34 @@ public class HQLFieldsConverter {
 
                         // 对于每一个字段
                         for (int i = 1; i <= metaData.getColumnCount(); ++i) {
-                            String value = resultSet.getString(i);
+                            String value = resultSet.getString(i), newContent;
                             if (value == null) {
-                                value = "";
+                                newContent = "";
                             }
-                            ArrayList<OriginalDependentTable> originalDependentTables = allOriginalDependentTables.get(i - 1);  // 当前字段所依赖的所有表、表字段
-                            String newContent = value;
-                            // 每一张原始表
-                            for (OriginalDependentTable originalDependentTable : originalDependentTables) {
-                                // 原始表的每一个依赖字段
-                                for (int j = 0; j < originalDependentTable.getFields().size(); ++j) {
-                                    // 应用规则
-                                    String filedName = originalDependentTable.getFields().get(j);
-                                    newContent = rules.applyRules(originalDependentTable.getTableInfo().getTableName(), filedName, newContent);
+                            else {
+                                OriginalDependentTables originalDependentTables = allOriginalDependentTables.get(i - 1);  // 当前字段所依赖的所有表、表字段
+                                newContent = value;
+
+                                // 每一张原始表
+                                boolean hasFoundRule = false;
+                                for (OriginalDependentTable originalDependentTable : originalDependentTables.getOriginalDependentTableArrayList()) {
+                                    // 原始表的每一个依赖字段
+                                    for (int j = 0; j < originalDependentTable.getFields().size(); ++j) {
+                                        // 应用规则
+                                        String filedName = originalDependentTable.getFields().get(j);
+                                        // 函数或者表达式
+                                        if(rules.findRule(originalDependentTable.getTableInfo().getTableName(), filedName) != null){
+                                            if(originalDependentTables.getIsIncludeFunctionOrExpression()){
+                                                newContent = StringUtils.repeat("*", value.length());
+                                                hasFoundRule = true;
+                                                break;
+                                            }
+                                            newContent = rules.applyRules(originalDependentTable.getTableInfo().getTableName(), filedName, newContent);
+                                        }
+                                    }
+                                    if(!hasFoundRule){
+                                        break;
+                                    }
                                 }
                             }
                             resultOfOneRow.add(metaData.getColumnName(i) + "\t" + newContent);
