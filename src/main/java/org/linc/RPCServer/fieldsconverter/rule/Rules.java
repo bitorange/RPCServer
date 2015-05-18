@@ -123,20 +123,80 @@ public class Rules {
 
     /**
      * 删除指定表的所有规则
+     *
      * @param tableName 需要删除规则的表
      * @throws IOException 写入规则文件失败
      */
     public void deleteRulesOfATable(String tableName) throws IOException {
-        Iterator<Rule> iterable = allRules.iterator();
-        while (iterable.hasNext()) {
-            Rule rule = iterable.next();
-            if(rule.getTableName().equals(tableName)){
-                iterable.remove();
+        Iterator<Rule> iterator = allRules.iterator();
+        while (iterator.hasNext()) {
+            Rule rule = iterator.next();
+            if (rule.getTableName().equals(tableName)) {
+                iterator.remove();
             }
         }
 
         updateRulesFile(allRules);
     }
+
+    /**
+     * 重命名特定表
+     *
+     * @param oldTableName 需要替换的表名
+     * @param newTableName 新表名
+     * @throws IOException 写入规则文件失败
+     */
+    public void renameTable(String oldTableName, String newTableName) throws IOException {
+        for (int i = 0; i < allRules.size(); ++i) {
+            Rule r = allRules.get(i);
+            if (r.getTableName().equals(oldTableName)) {
+                Rule newRue = new Rule(newTableName, r.getColumnName(), r.getRex(), r.getReplaceContent());
+                allRules.set(i, newRue);
+            }
+        }
+
+        updateRulesFile(allRules);
+    }
+
+    /**
+     * 替换表指定表指定列的列名
+     *
+     * @param tableName     表名
+     * @param oldColumnName 原列名
+     * @param newColumnName 新列名
+     * @throws IOException 写入规则文件失败
+     */
+    public void replaceColumnName(String tableName, String oldColumnName, String newColumnName) throws IOException {
+        for (int i = 0; i < allRules.size(); ++i) {
+            Rule r = allRules.get(i);
+            if (r.getTableName().equals(tableName) && r.getColumnName().equals(oldColumnName)) {
+                Rule newRue = new Rule(tableName, newColumnName, r.getRex(), r.getReplaceContent());
+                allRules.set(i, newRue);
+            }
+        }
+
+        updateRulesFile(allRules);
+    }
+
+    /**
+     * 删除指定表名 / 字段名的规则
+     *
+     * @param tableName  表名
+     * @param columnName 字段名
+     * @throws IOException 写入规则文件失败
+     */
+    public void deleteColumn(String tableName, String columnName) throws IOException {
+        Iterator<Rule> iterator = allRules.iterator();
+        while (iterator.hasNext()) {
+            Rule rule = iterator.next();
+            if (rule.getTableName().equals(tableName) && rule.getColumnName().equals(columnName)) {
+                iterator.remove();
+            }
+        }
+
+        updateRulesFile(allRules);
+    }
+
 
     /**
      * 更新规则文件

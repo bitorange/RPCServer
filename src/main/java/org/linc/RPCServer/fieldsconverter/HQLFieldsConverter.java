@@ -813,14 +813,6 @@ public class HQLFieldsConverter {
     }
 
     /**
-     * 将 SQL 命令执行的结果进行字段转换
-     *
-     * @param command   需要执行的命令
-     * @param resultSet 执行 SQL 语句得到的结果
-     * @return 转换后的结果，中途出现错误输出错误并返回 null
-     */
-
-    /**
      * 解析 SQL 命令，对 SQL 命令所得到的结果集应用规则
      *
      * @param command   需要解析的 SQL 命令
@@ -900,8 +892,7 @@ public class HQLFieldsConverter {
                             String value = resultSet.getString(i), newContent;
                             if (value == null) {
                                 newContent = "";
-                            }
-                            else {
+                            } else {
                                 OriginalDependentTables originalDependentTables = allOriginalDependentTables.get(i - 1);  // 当前字段所依赖的所有表、表字段
                                 newContent = value;
 
@@ -913,8 +904,8 @@ public class HQLFieldsConverter {
                                         // 应用规则
                                         String filedName = originalDependentTable.getFields().get(j);
                                         // 函数或者表达式
-                                        if(rules.findRule(originalDependentTable.getTableInfo().getTableName(), filedName) != null){
-                                            if(originalDependentTables.getIsIncludeFunctionOrExpression()){
+                                        if (rules.findRule(originalDependentTable.getTableInfo().getTableName(), filedName) != null) {
+                                            if (originalDependentTables.getIsIncludeFunctionOrExpression()) {
                                                 newContent = StringUtils.repeat("*", value.length());
                                                 hasFoundRule = true;
                                                 break;
@@ -922,7 +913,7 @@ public class HQLFieldsConverter {
                                             newContent = rules.applyRules(originalDependentTable.getTableInfo().getTableName(), filedName, newContent);
                                         }
                                     }
-                                    if(!hasFoundRule){
+                                    if (!hasFoundRule) {
                                         break;
                                     }
                                 }
@@ -934,9 +925,9 @@ public class HQLFieldsConverter {
                 }
             } else {
                 // ONLY FOR TOK_CREATETABLE
-                if (getChild(tree, "TOK_CREATETABLE") != null){
+                if (getChild(tree, "TOK_CREATETABLE") != null) {
                     // 获取新表的表名
-                    ASTNode newTableNode = (ASTNode)getChild(getChild(getChild(tree, "TOK_CREATETABLE"), "TOK_TABNAME"), "Identifier");
+                    ASTNode newTableNode = (ASTNode) getChild(getChild(getChild(tree, "TOK_CREATETABLE"), "TOK_TABNAME"), "Identifier");
                     String newTableName = newTableNode.toString();
 
                     // 获取字段，与 TOK_QUERY 相同
@@ -977,13 +968,45 @@ public class HQLFieldsConverter {
                         }
                     }
                 }
-                // ONLY FOR TOK_DROPTABLE
-                else if(getChild(tree, "TOK_DROPTABLE") != null){
-                    ASTNode droppedTableNode = (ASTNode)getChild(getChild(getChild(tree, "TOK_DROPTABLE"), "TOK_TABNAME"), "Identifier");
+                // 删除数据表
+                else if (getChild(tree, "TOK_DROPTABLE") != null) {
+                    ASTNode droppedTableNode = (ASTNode) getChild(getChild(getChild(tree, "TOK_DROPTABLE"), "TOK_TABNAME"), "Identifier");
                     String droppedTableName = droppedTableNode.toString();
 
                     // 删除规则
                     rules.deleteRulesOfATable(droppedTableName);
+                }
+
+                // 修改数据表表名
+                else if(getChild(tree, "TOK_ALTERTABLE_RENAME") != null){
+                    String oldTableName = getChild(tree, "TOK_ALTERTABLE_RENAME").getChild(0).toString();
+                    String newTableName = getChild(tree, "TOK_ALTERTABLE_RENAME").getChild(1).toString();
+
+                    // 修改表名
+                    rules.renameTable(oldTableName, newTableName);
+                }
+                // 修改列名
+                else if(getChild(tree, "TOK_ALTERTABLE_RENAMECOL") != null){
+                    String tableName = getChild(tree, "TOK_ALTERTABLE_RENAMECOL").getChild(0).toString();
+                    String oldColumnName = getChild(tree, "TOK_ALTERTABLE_RENAMECOL").getChild(1).toString();
+                    String newColumnName = getChild(tree, "TOK_ALTERTABLE_RENAMECOL").getChild(2).toString();
+
+                    // 修改列名
+                    rules.replaceColumnName(tableName, oldColumnName, newColumnName);
+                }
+                else if(getChild(tree, "TOK_ALTERTABLE_REPLACECOLS") != null){
+                    String tableName = getChild(tree, "TOK_ALTERTABLE_REPLACECOLS").getChild(0).toString();
+                    ArrayList<FieldInfo> originalFileds = getFieldsOfATable(tableName);
+                    ASTNode colNodeLists = getChild(getChild(tree, "TOK_ALTERTABLE_REPLACECOLS"), "TOK_TABCOLLIST");
+                    ArrayList<String> newFields = new ArrayList<String>();
+                    for(Node child: colNodeLists.getChildren()){
+                        ASTNode node = (ASTNode) child;
+                        if(node.toString().equals("TOK_TABCOL")){
+                            newFields.add(getChild(node, "Identifier").toString());
+                        }
+                    }
+
+                    newFields.add("hi");
                 }
                 else if (resultSet != null) {
                     ResultSetMetaData metaData = resultSet.getMetaData();
@@ -1006,7 +1029,6 @@ public class HQLFieldsConverter {
             System.err.println("Err: Result Set get next result error " + e.getMessage());
             return null;
         } catch (Exception e) {
-            // e.printStackTrace();
             System.err.println("Err: 未知错误 : " + e.getMessage());
             return null;
         }
