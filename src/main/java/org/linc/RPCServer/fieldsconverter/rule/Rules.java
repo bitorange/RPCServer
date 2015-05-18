@@ -76,6 +76,9 @@ public class Rules {
      * @return 应用规则后的新文本
      */
     public String applyRules(String tableName, String columnName, String originalContent) {
+        // 重新读取规则
+        readRules(ruleFilePath);
+
         String newContent = originalContent;
         for (Rule rule : allRules) {
             if (rule.checkAvailable(tableName, columnName)) {

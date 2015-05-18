@@ -994,6 +994,7 @@ public class HQLFieldsConverter {
                     // 修改列名
                     rules.replaceColumnName(tableName, oldColumnName, newColumnName);
                 }
+                // TOD  O: 提前获取数据表内容
                 else if(getChild(tree, "TOK_ALTERTABLE_REPLACECOLS") != null){
                     String tableName = getChild(tree, "TOK_ALTERTABLE_REPLACECOLS").getChild(0).toString();
                     ArrayList<FieldInfo> originalFileds = getFieldsOfATable(tableName);
@@ -1005,8 +1006,6 @@ public class HQLFieldsConverter {
                             newFields.add(getChild(node, "Identifier").toString());
                         }
                     }
-
-                    newFields.add("hi");
                 }
                 else if (resultSet != null) {
                     ResultSetMetaData metaData = resultSet.getMetaData();
