@@ -892,10 +892,9 @@ public class HQLFieldsConverter {
                         for (int i = 1; i <= metaData.getColumnCount(); ++i) {
                             String value = resultSet.getString(i), newContent;
                             // 二进制类型数据
-                            if(metaData.getColumnType(i) == Types.BINARY){
+                            if (metaData.getColumnType(i) == Types.BINARY) {
                                 newContent = "* Binary Data *";
-                            }
-                            else {
+                            } else {
                                 if (value == null) {
                                     newContent = "";
                                 } else {
@@ -932,7 +931,7 @@ public class HQLFieldsConverter {
                 }
             } else {
                 // ONLY FOR TOK_CREATETABLE
-                if (getChild(tree, "TOK_CREATETABLE") != null) {
+                if (getChild(tree, "TOK_CREATETABLE") != null && getChild(getChild(tree, "TOK_CREATETABLE"), "TOK_QUERY") != null) {
                     // 获取新表的表名
                     ASTNode newTableNode = (ASTNode) getChild(getChild(getChild(tree, "TOK_CREATETABLE"), "TOK_TABNAME"), "Identifier");
                     String newTableName = newTableNode.toString();
