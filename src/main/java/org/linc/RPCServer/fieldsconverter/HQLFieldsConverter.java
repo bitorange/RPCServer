@@ -16,6 +16,7 @@ import java.lang.reflect.Modifier;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.*;
 
 /**
@@ -890,31 +891,37 @@ public class HQLFieldsConverter {
                         // 对于每一个字段
                         for (int i = 1; i <= metaData.getColumnCount(); ++i) {
                             String value = resultSet.getString(i), newContent;
-                            if (value == null) {
-                                newContent = "";
-                            } else {
-                                OriginalDependentTables originalDependentTables = allOriginalDependentTables.get(i - 1);  // 当前字段所依赖的所有表、表字段
-                                newContent = value;
+                            // 二进制类型数据
+                            if(metaData.getColumnType(i) == Types.BINARY){
+                                newContent = "* Binary Data *";
+                            }
+                            else {
+                                if (value == null) {
+                                    newContent = "";
+                                } else {
+                                    OriginalDependentTables originalDependentTables = allOriginalDependentTables.get(i - 1);  // 当前字段所依赖的所有表、表字段
+                                    newContent = value;
 
-                                // 每一张原始表
-                                boolean hasFoundRule = false;
-                                for (OriginalDependentTable originalDependentTable : originalDependentTables.getOriginalDependentTableArrayList()) {
-                                    // 原始表的每一个依赖字段
-                                    for (int j = 0; j < originalDependentTable.getFields().size(); ++j) {
-                                        // 应用规则
-                                        String filedName = originalDependentTable.getFields().get(j);
-                                        // 函数或者表达式
-                                        if (rules.findRule(originalDependentTable.getTableInfo().getTableName(), filedName) != null) {
-                                            if (originalDependentTables.getIsIncludeFunctionOrExpression()) {
-                                                newContent = StringUtils.repeat("*", value.length());
-                                                hasFoundRule = true;
-                                                break;
+                                    // 每一张原始表
+                                    boolean hasFoundRule = false;
+                                    for (OriginalDependentTable originalDependentTable : originalDependentTables.getOriginalDependentTableArrayList()) {
+                                        // 原始表的每一个依赖字段
+                                        for (int j = 0; j < originalDependentTable.getFields().size(); ++j) {
+                                            // 应用规则
+                                            String filedName = originalDependentTable.getFields().get(j);
+                                            // 函数或者表达式
+                                            if (rules.findRule(originalDependentTable.getTableInfo().getTableName(), filedName) != null) {
+                                                if (originalDependentTables.getIsIncludeFunctionOrExpression()) {
+                                                    newContent = StringUtils.repeat("*", value.length());
+                                                    hasFoundRule = true;
+                                                    break;
+                                                }
+                                                newContent = rules.applyRules(originalDependentTable.getTableInfo().getTableName(), filedName, newContent);
                                             }
-                                            newContent = rules.applyRules(originalDependentTable.getTableInfo().getTableName(), filedName, newContent);
                                         }
-                                    }
-                                    if (!hasFoundRule) {
-                                        break;
+                                        if (!hasFoundRule) {
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -978,7 +985,7 @@ public class HQLFieldsConverter {
                 }
 
                 // 修改数据表表名
-                else if(getChild(tree, "TOK_ALTERTABLE_RENAME") != null){
+                else if (getChild(tree, "TOK_ALTERTABLE_RENAME") != null) {
                     String oldTableName = getChild(tree, "TOK_ALTERTABLE_RENAME").getChild(0).toString();
                     String newTableName = getChild(tree, "TOK_ALTERTABLE_RENAME").getChild(1).toString();
 
@@ -986,7 +993,7 @@ public class HQLFieldsConverter {
                     rules.renameTable(oldTableName, newTableName);
                 }
                 // 修改列名
-                else if(getChild(tree, "TOK_ALTERTABLE_RENAMECOL") != null){
+                else if (getChild(tree, "TOK_ALTERTABLE_RENAMECOL") != null) {
                     String tableName = getChild(tree, "TOK_ALTERTABLE_RENAMECOL").getChild(0).toString();
                     String oldColumnName = getChild(tree, "TOK_ALTERTABLE_RENAMECOL").getChild(1).toString();
                     String newColumnName = getChild(tree, "TOK_ALTERTABLE_RENAMECOL").getChild(2).toString();
@@ -995,19 +1002,18 @@ public class HQLFieldsConverter {
                     rules.replaceColumnName(tableName, oldColumnName, newColumnName);
                 }
                 // TOD  O: 提前获取数据表内容
-                else if(getChild(tree, "TOK_ALTERTABLE_REPLACECOLS") != null){
+                else if (getChild(tree, "TOK_ALTERTABLE_REPLACECOLS") != null) {
                     String tableName = getChild(tree, "TOK_ALTERTABLE_REPLACECOLS").getChild(0).toString();
                     ArrayList<FieldInfo> originalFileds = getFieldsOfATable(tableName);
                     ASTNode colNodeLists = getChild(getChild(tree, "TOK_ALTERTABLE_REPLACECOLS"), "TOK_TABCOLLIST");
                     ArrayList<String> newFields = new ArrayList<String>();
-                    for(Node child: colNodeLists.getChildren()){
+                    for (Node child : colNodeLists.getChildren()) {
                         ASTNode node = (ASTNode) child;
-                        if(node.toString().equals("TOK_TABCOL")){
+                        if (node.toString().equals("TOK_TABCOL")) {
                             newFields.add(getChild(node, "Identifier").toString());
                         }
                     }
-                }
-                else if (resultSet != null) {
+                } else if (resultSet != null) {
                     ResultSetMetaData metaData = resultSet.getMetaData();
                     while (resultSet.next()) {
                         ArrayList<String> resultOfOneRow = new ArrayList<String>();

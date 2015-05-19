@@ -38,6 +38,7 @@ public class Rules {
             System.err.println("Err: 规则文件 " + ruleFilePath + " 未找到");
             return false;
         }
+
         BufferedReader br = new BufferedReader(new InputStreamReader(fstream));
 
         String strLine;
