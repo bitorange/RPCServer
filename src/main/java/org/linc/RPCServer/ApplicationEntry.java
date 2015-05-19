@@ -91,12 +91,14 @@ public class ApplicationEntry extends Thread {
             }
         } catch (Exception e) {
             String msg = e.getMessage();
+            msg = msg.replace("\"", "'");
+            msg = msg.replace("\n", "\\n");
             response = "{\"code\": \"10\",\"msg\": \"" + msg + "\"}";
             System.out.println("111::" + response);
             return response;
         }
 
-        /* 将查询出来的结果转换为json数据格式 */
+        /* 将查询出来的结果转换为 JSON 数据格式 */
         JSONObject jsonObject;
         try {
             // jsonObject = conn.transformToJsonArray(rs);
@@ -105,6 +107,8 @@ public class ApplicationEntry extends Thread {
         } catch (Exception e) {
             // e.printStackTrace();
             String msg = e.getMessage();
+            msg = msg.replace("\"", "'");
+            msg = msg.replace("\n", "\\n");
             response = "{\"code\": \"10\",\"msg\": \"" + msg + "\"}";
         } finally {
             //    JDBCUtils.releaseAll();
@@ -149,10 +153,7 @@ public class ApplicationEntry extends Thread {
                     String sql = jsonObject.getString("sql");
                     ApplicationEntry myServer = new ApplicationEntry();
 
-                    System.out.println("1");
                     response = myServer.sqlExecute(sql, con);
-                    System.out.println("2");
-
                 } else {
                     // TODO: 相应处理
                     /* 请求服务出错 */
