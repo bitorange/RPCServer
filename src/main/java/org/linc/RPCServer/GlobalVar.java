@@ -24,7 +24,7 @@ public class GlobalVar {
         // 解析程序运行参数
         ArgumentParser parser = ArgumentParsers.newArgumentParser("console").defaultHelp(true).description("Spark SQL Server By LINC");
         parser.addArgument("-c", "--config")
-                .setDefault("./server.xml")
+                .setDefault("./rpcserver.xml")
                 .help("specify the system configuration file");
 
         Namespace ns = null;
