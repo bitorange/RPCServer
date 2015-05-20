@@ -8,6 +8,6 @@
 		<entry key="db.url">jdbc:hive2://10.4.21.220:10000/ihainan</entry>
 		<entry key="db.driver">org.apache.hive.jdbc.HiveDriver</entry>
 		<entry key="db.jdbc.connections">2</entry>
-		<entry key="spark.log.path">/Users/ihainan/tmp/sparksql--master-1427427041872/EVENT_LOG_1</entry>
-		<entry key="rules.path">/Users/ihainan/tmp/rules</entry>
+		<entry key="spark.log.path">/home/ihainan/tmp/sparksql--master-1427427041872/EVENT_LOG_1</entry>
+		<entry key="rules.path">rules</entry>
 </property>

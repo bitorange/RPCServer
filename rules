@@ -1,0 +1,3 @@
+info	id	^[0-9]{14}	**************
+user	password	^[0-9]{3}	xxx
+t6	password	^[0-9]{3}	xxx
