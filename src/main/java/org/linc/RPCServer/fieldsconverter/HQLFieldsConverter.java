@@ -1,5 +1,6 @@
 package org.linc.RPCServer.fieldsconverter;
 
+import javafx.scene.control.Tab;
 import org.apache.commons.lang.StringUtils;
 import org.linc.RPCServer.ConnectJDBC;
 import org.linc.RPCServer.fieldsconverter.hqlparserresult.*;
@@ -546,52 +547,65 @@ public class HQLFieldsConverter {
         } else {
             // 多表情况，TOK_JOIN -> TOK_TABREF / TOK_SUBQUERY / TOK_JOIN
             ASTNode joinNode = getJOINNode(fromNode);
-            while (joinNode != null) {
-                // 第二个子节点，只可能是子查询或者表
-                ASTNode child1 = (ASTNode) joinNode.getChild(1);
-                TableInfo tableInfo1;
-
-                // FROM 表
-                if (child1.getToken().getType() == HiveParser.TOK_TABREF) {
-                    tableInfo1 = getTableInfoOfNode(child1);
-                }
-                // FROM 子查询
-                else if (child1.getToken().getType() == HiveParser.TOK_SUBQUERY) {
-                    tableInfo1 = queryAnalyse(getChild(child1, "TOK_QUERY"), false).getTableInfo();
-                } else {
-                    System.err.println("Error: Join 节点下第二个子节点不为子查询或者表");
-                    return null;
-                }
-
-                // 第一个子节点，可能是Join，子查询或者表
-                ASTNode child0 = (ASTNode) joinNode.getChild(0);
-                TableInfo tableInfo0 = null;
-                if (checkIsJOINTypeNode(child0)) {
-                    // if(child0.getToken().getType() == HiveParser.TOK_JOIN){
-                    joinNode = child0;
-                } else {
-                    if (child0.getToken().getType() == HiveParser.TOK_TABREF) {
-                        tableInfo0 = getTableInfoOfNode(child0);
-                    } else if (child0.getToken().getType() == HiveParser.TOK_SUBQUERY) {
-                        tableInfo0 = queryAnalyse(getChild(child0, "TOK_QUERY"), false).getTableInfo();
-                    } else {
-                        System.err.println("Error: Join 节点下第一个子节点不为 Join、子查询或者表");
-                        return null;
-                    }
-                    joinNode = null;
-                }
-
-                if(tableInfo0 != null) {
-                    fromTablesInfo.add(tableInfo0);
-                }
-
-                if(tableInfo1 != null) {
-                    fromTablesInfo.add(tableInfo1);
-                }
-            }
+            fromTablesInfo.addAll(joinASTAnalyse(joinNode));
         }
         return new FromAnalyseResult(fromTablesInfo);
     }
+
+    /**
+     * 分析 JOIN AST 列表，得到有序的来源表信息
+     * @param joinNode 需要分析的 JOIN AST 节点
+     * @return JOIN 从句中涉及到的来源表
+     * @throws Exception 从数据库中获取某数据表信息失败
+     */
+    private ArrayList<TableInfo> joinASTAnalyse(ASTNode joinNode) throws Exception {
+        ArrayList<TableInfo> fromTablesInfo = new ArrayList<TableInfo>();
+
+        // 类型检查
+        if(!checkIsJOINTypeNode(joinNode)){
+            return null;
+        }
+
+        // 第一个子节点，可能是Join，子查询或者表
+        ASTNode child0 = (ASTNode) joinNode.getChild(0);
+        TableInfo tableInfo0;
+        if (checkIsJOINTypeNode(child0)) {
+            fromTablesInfo.addAll(joinASTAnalyse(child0));
+        } else {
+            if (child0.getToken().getType() == HiveParser.TOK_TABREF) {
+                tableInfo0 = getTableInfoOfNode(child0);
+                fromTablesInfo.add(tableInfo0);
+            } else if (child0.getToken().getType() == HiveParser.TOK_SUBQUERY) {
+                tableInfo0 = queryAnalyse(getChild(child0, "TOK_QUERY"), false).getTableInfo();
+                fromTablesInfo.add(tableInfo0);
+            } else {
+                System.err.println("Error: Join 节点下第一个子节点不为 Join、子查询或者表");
+                return null;
+            }
+        }
+
+
+        // 第二个子节点，只可能是子查询或者表
+        ASTNode child1 = (ASTNode) joinNode.getChild(1);
+        TableInfo tableInfo1;
+
+        // FROM 表
+        if (child1.getToken().getType() == HiveParser.TOK_TABREF) {
+            tableInfo1 = getTableInfoOfNode(child1);
+            fromTablesInfo.add(tableInfo1);
+        }
+        // FROM 子查询
+        else if (child1.getToken().getType() == HiveParser.TOK_SUBQUERY) {
+            tableInfo1 = queryAnalyse(getChild(child1, "TOK_QUERY"), false).getTableInfo();
+            fromTablesInfo.add(tableInfo1);
+        } else {
+            System.err.println("Error: Join 节点下第二个子节点不为子查询或者表");
+            return null;
+        }
+
+        return fromTablesInfo;
+    }
+
 
     /**
      * 所有类型的 JOIN 语句对应 AST 节点的类型名
@@ -821,7 +835,7 @@ public class HQLFieldsConverter {
         for (DependentTable table : dependenceOfTables.get(tableName + ", " + alias)) {
             // 保证字段来源于该表
             // Direct From Table 如果为空，说明为包含函数或者表达式的字段，该字段名字唯一
-            if(field.getDirectFromTable() == null || field.getDirectFromTable().equals(table.getTableInfo())) {
+            if (field.getDirectFromTable() == null || field.getDirectFromTable().equals(table.getTableInfo())) {
                 // 只用表名进行搜索，SELECT 中的字段别名是给上一层使用的
                 if (table.findField(field.getFiledName()) != null) {
                     return table;
