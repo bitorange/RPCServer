@@ -943,7 +943,10 @@ public class HQLFieldsConverter {
                                     }
                                 }
                             }
-                            resultOfOneRow.add(metaData.getColumnName(i) + "\t" + newContent);
+                            TableInfo fromTable = queryAnalyseResult.getInsertAnalyseResult().getAllSelectedFields().get(i - 1).getDirectFromTable();
+                            String tableName = fromTable.getTableName() == null ? (fromTable.getAliasName() == null ? "" : fromTable.getAliasName() + ".") : fromTable.getTableName() + ".";
+                            resultOfOneRow.add(tableName
+                                    + metaData.getColumnName(i) + "\t" + newContent);
                         }
                         finalResult.add(resultOfOneRow);
                     }

@@ -6,6 +6,7 @@ import org.json.JSONObject;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 
 /**
  * 本类通过 JDBC 连接远程服务器，并提供接口来执行 SQL 命令
@@ -66,6 +67,7 @@ public class ConnectJDBC {
         JSONArray jsonArray = new JSONArray();
         for (ArrayList<String> dataRow : resultList) {
             JSONObject jsonObj = new JSONObject();
+            LinkedHashMap linkedHashMap = new LinkedHashMap();
             for (int i = 0; i < dataRow.size(); ++i) {
                 String resultOfOneRow = dataRow.get(i);
                 String columnName = resultOfOneRow.split("\t")[0];
@@ -82,11 +84,9 @@ public class ConnectJDBC {
                     columnName = columnName + "_" + sameColumnsNum;
                 }
 
-                try {
-                    jsonObj.put(columnName, value);
-                } catch (JSONException e) {
-                    throw new Exception("字段转换成 JSON 数据失败");
-                }
+                // jsonObj.put(columnName, value);
+                linkedHashMap.put(columnName, value);
+                jsonObj = new JSONObject(linkedHashMap);
             }
             jsonArray.put(jsonObj);
         }
