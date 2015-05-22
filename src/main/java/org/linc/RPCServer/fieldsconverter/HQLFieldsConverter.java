@@ -549,16 +549,15 @@ public class HQLFieldsConverter {
             while (joinNode != null) {
                 // 第二个子节点，只可能是子查询或者表
                 ASTNode child1 = (ASTNode) joinNode.getChild(1);
+                TableInfo tableInfo1;
 
                 // FROM 表
                 if (child1.getToken().getType() == HiveParser.TOK_TABREF) {
-                    TableInfo tableInfo = getTableInfoOfNode(child1);
-                    fromTablesInfo.add(tableInfo);
+                    tableInfo1 = getTableInfoOfNode(child1);
                 }
                 // FROM 子查询
                 else if (child1.getToken().getType() == HiveParser.TOK_SUBQUERY) {
-                    TableInfo tableInfo = queryAnalyse(getChild(child1, "TOK_QUERY"), false).getTableInfo();
-                    fromTablesInfo.add(tableInfo);
+                    tableInfo1 = queryAnalyse(getChild(child1, "TOK_QUERY"), false).getTableInfo();
                 } else {
                     System.err.println("Error: Join 节点下第二个子节点不为子查询或者表");
                     return null;
@@ -566,21 +565,28 @@ public class HQLFieldsConverter {
 
                 // 第一个子节点，可能是Join，子查询或者表
                 ASTNode child0 = (ASTNode) joinNode.getChild(0);
+                TableInfo tableInfo0 = null;
                 if (checkIsJOINTypeNode(child0)) {
                     // if(child0.getToken().getType() == HiveParser.TOK_JOIN){
                     joinNode = child0;
                 } else {
                     if (child0.getToken().getType() == HiveParser.TOK_TABREF) {
-                        TableInfo tableInfo = getTableInfoOfNode(child0);
-                        fromTablesInfo.add(tableInfo);
+                        tableInfo0 = getTableInfoOfNode(child0);
                     } else if (child0.getToken().getType() == HiveParser.TOK_SUBQUERY) {
-                        TableInfo tableInfo = queryAnalyse(getChild(child0, "TOK_QUERY"), false).getTableInfo();
-                        fromTablesInfo.add(tableInfo);
+                        tableInfo0 = queryAnalyse(getChild(child0, "TOK_QUERY"), false).getTableInfo();
                     } else {
                         System.err.println("Error: Join 节点下第一个子节点不为 Join、子查询或者表");
                         return null;
                     }
                     joinNode = null;
+                }
+
+                if(tableInfo0 != null) {
+                    fromTablesInfo.add(tableInfo0);
+                }
+
+                if(tableInfo1 != null) {
+                    fromTablesInfo.add(tableInfo1);
                 }
             }
         }
