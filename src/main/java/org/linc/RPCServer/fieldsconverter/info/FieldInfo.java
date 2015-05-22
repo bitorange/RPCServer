@@ -26,28 +26,27 @@ public class FieldInfo {
 
     private String filedName;
     private String fieldAlias;
-    private ASTNode fieldNode;
+    private TableInfo directFromTable;
+
+    /**
+     * 字段的直接来源表
+     *
+     * @return 字段的直接来源表
+     */
+    public TableInfo getDirectFromTable() {
+        return directFromTable;
+    }
 
     /**
      * 构造函数
      *
      * @param fieldName  字段名
      * @param fieldAlias 字段别名
-     * @param fieldNode  字段对应在 AST 中的节点
      */
-    public FieldInfo(String fieldName, String fieldAlias, ASTNode fieldNode) {
+    public FieldInfo(String fieldName, String fieldAlias, TableInfo directFromTable) {
         this.fieldAlias = fieldAlias;
         this.filedName = fieldName;
-        this.fieldNode = fieldNode;
-    }
-
-    /**
-     * 获取字段对应在 AST 中的节点
-     *
-     * @return 字段对应的 AST 节点
-     */
-    public ASTNode getFieldNode() {
-        return fieldNode;
+        this.directFromTable = directFromTable;
     }
 
     /**
