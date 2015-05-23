@@ -49,6 +49,12 @@ public class TableInfo {
     private String aliasName;    // 表别名
     private ArrayList<FieldInfo> fields = new ArrayList<FieldInfo>();  // 表中包含的域
 
+
+    @Override
+    public String toString() {
+        return tableName + ", " + aliasName;
+    }
+
     /**
      * 构造函数
      *

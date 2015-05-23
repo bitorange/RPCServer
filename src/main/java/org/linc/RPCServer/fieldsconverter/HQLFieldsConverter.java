@@ -197,7 +197,7 @@ public class HQLFieldsConverter {
             return null;
         }
 
-        ArrayList<FieldInfo> allSelectedFields = new ArrayList<FieldInfo>();  // 所有 SELECT 字段的汇总
+        ArrayList<FieldInfo> allSelectedFields = new ArrayList<FieldInfo>();    // 所有 SELECT 字段的汇总
         ArrayList<DependentTable> dependentTables = new ArrayList<DependentTable>();
         ArrayList<String> insertTables = new ArrayList<String>();
 
@@ -217,7 +217,7 @@ public class HQLFieldsConverter {
 
             // * 形式或者 Table.*
             if (prChild.getToken().getType() == HiveParser.TOK_ALLCOLREF) {
-                // *
+                // *，不可能存在别名
                 ASTNode tabNameNode = getChild(prChild, "TOK_TABNAME");
                 if (tabNameNode == null) {
                     // 获取表名和别名以及所依赖的字段
@@ -226,8 +226,8 @@ public class HQLFieldsConverter {
                         return null;
                     }
                     for (TableInfo tableInfo : fromTablesInfo) {
-                        ArrayList<FieldInfo> fields = tableInfo.getFields();
                         // 获取字段的直接来源表
+                        ArrayList<FieldInfo> fields = tableInfo.getFields();
                         for (int i = 0; i < fields.size(); ++i) {
                             FieldInfo field = fields.get(i);
                             FieldInfo newField = new FieldInfo(field.getFiledName(), field.getFieldAlias(), tableInfo);
@@ -241,10 +241,11 @@ public class HQLFieldsConverter {
                         allSelectedFields.addAll(fields);
                     }
 
-                    // 新表只有一个字段，直接 break
+                    // * 说明新表只有一个字段，直接 break
                     break;
                 }
-                // Table.*
+
+                // Table.*，不可能存在别名
                 else {
                     // 获取表名
                     String selectedTableNameOrAlias = getChild(tabNameNode, "Identifier").toString();
@@ -263,7 +264,7 @@ public class HQLFieldsConverter {
                     if (tableToFind != null) {
                         for (FieldInfo fieldInfo : tableToFind.getFields()) {
                             FieldInfo newFieldInfo = new FieldInfo(fieldInfo.getFiledName(), fieldInfo.getFieldAlias(), tableToFind);
-                            dependentTables = this.addFieldIntoDependentTables(dependentTables, tableToFind, newFieldInfo);
+                            dependentTables = this.createOrUpdateDependentTables(dependentTables, tableToFind, newFieldInfo);
                             allSelectedFields.add(newFieldInfo);
                         }
                     } else {
@@ -271,14 +272,14 @@ public class HQLFieldsConverter {
                         return null;
                     }
 
-                    // 可能有多个字段，不 Break
+                    // 可能还有其他字段，不 Break
                 }
             } else {
                 // NULL 形式，只能用在 INSERT INTO 或者 INSERT OVERWRITE 情况，在 dependentTables 某个特殊表中记录
                 if (prChild.getToken().getType() == HiveParser.TOK_NULL) {
                     FieldInfo fieldInfo = new FieldInfo(null, null, null);
                     allSelectedFields.add(fieldInfo);
-                    dependentTables = this.addFieldIntoDependentTables(dependentTables,
+                    dependentTables = this.createOrUpdateDependentTables(dependentTables,
                             new TableInfo(TableInfo.NULL_TABLE, TableInfo.NULL_TABLE, null), fieldInfo);
                 }
 
@@ -307,31 +308,22 @@ public class HQLFieldsConverter {
                     // 获取字段别名
                     if (getChild((ASTNode) prChild.getParent(), "Identifier") != null) {
                         ASTNode identifierNode = getChild((ASTNode) prChild.getParent(), "Identifier");
-                        if (identifierNode != null) {
-                            fieldAlias = identifierNode.toString();
-                        } else {
-                            System.err.println("Err: 别名节点不存在");
-                            return null;
-                        }
+                        fieldAlias = identifierNode.toString();
                     }
                     allSelectedFields.add(new FieldInfo(fieldName, fieldAlias, tableToFind));
 
                     // 更新
-                    dependentTables = this.addFieldIntoDependentTables(dependentTables, tableToFind, new FieldInfo(fieldName, fieldAlias, tableToFind));
+                    dependentTables = this.createOrUpdateDependentTables(dependentTables, tableToFind, new FieldInfo(fieldName, fieldAlias, tableToFind));
                 }
-                // 纯 Field 形式，Field 不可为 *
+
+                // 纯 Field 形式，Field 不可为 *，可能存在别名
                 else if (prChild.getToken().getType() == HiveParser.TOK_TABLE_OR_COL) {
                     // 字段名和字段别名
                     String fieldName = getChild(prChild, "Identifier").toString();
                     String fieldAlias = null;
                     if (getChild((ASTNode) prChild.getParent(), "Identifier") != null) {
                         ASTNode identifierNode = getChild((ASTNode) prChild.getParent(), "Identifier");
-                        if (identifierNode != null) {
-                            fieldAlias = identifierNode.toString();
-                        } else {
-                            System.err.println("Err: 别名节点不存在");
-                            return null;
-                        }
+                        fieldAlias = identifierNode.toString();
                     }
 
                     // 表名
@@ -347,19 +339,20 @@ public class HQLFieldsConverter {
                     // 更新
                     if (tableToFind != null) {
                         allSelectedFields.add(new FieldInfo(fieldName, fieldAlias, tableToFind));
-                        dependentTables = this.addFieldIntoDependentTables(dependentTables, tableToFind,
+                        dependentTables = this.createOrUpdateDependentTables(dependentTables, tableToFind,
                                 new FieldInfo(fieldName, fieldAlias, tableToFind));
                     } else {
                         System.err.println("Err: 无法在来源表信息中找到相应的字段");
                         return null;
                     }
                 }
-                // 函数或者表达式
+
+                // 函数或者表达式，可能存在别名
                 else {
-                    // 表名与别名 - 未知
+                    // 表名与表别名 - 未知
                     TableInfo tableInfo = new TableInfo(TableInfo.UNKNOWN_TABLE, TableInfo.UNKNOWN_TABLE_ALIAS, null);
 
-                    // 检测字段有无别名，如果没有，使用 c_x 表示
+                    // 获取字段名，并检测字段有无别名，如果没有，使用 c_x 表示
                     String fieldName = "c_" + numOfColumns;
                     String fieldAlias = "c_" + numOfColumns;
                     ASTNode prParent = (ASTNode) prChild.getParent();
@@ -367,12 +360,12 @@ public class HQLFieldsConverter {
                         fieldAlias = getChild(prParent, "Identifier").toString();
                     }
 
-                    // 解析，平摊，取出所有的TOK_TABLE_OR_COL，对应的表信息，以及 Filed（别名修改为 c_x_y）
+                    // 解析，平摊，取出所有的TOK_TABLE_OR_COL，对应的表信息，以及 Filed（别名登记为 [字段别名_y]）
                     this.innerFieldNumber = 0;
                     dependentTables = getAllInnerFields(prChild, dependentTables, fromTablesInfo, fieldAlias);
 
-                    // 更新 dependentTables，添加 UNKNOWN_TABLE
-                    dependentTables = this.addFieldIntoDependentTables(dependentTables, tableInfo, new FieldInfo(fieldName, fieldAlias, tableInfo));
+                    // 更新 dependentTables，更新 UNKNOWN_TABLE 中存储的字段
+                    dependentTables = this.createOrUpdateDependentTables(dependentTables, tableInfo, new FieldInfo(fieldName, fieldAlias, tableInfo));
 
                     // 更新 allSelectedFields，添加当前 FieldInfo
                     allSelectedFields.add(new FieldInfo(fieldName, fieldAlias, tableInfo));
@@ -428,7 +421,8 @@ public class HQLFieldsConverter {
             ASTNode childAST = (ASTNode) child;
 
             // 如果子节点是函数，或者表达式，递归
-            if (childAST.toString().equals("TOK_FUNCTION") || Arrays.asList(OPERATIONS_LIST).contains(childAST.toString())) {
+            if (childAST.toString().equals("TOK_FUNCTION")
+                    || Arrays.asList(OPERATIONS_LIST).contains(childAST.toString())) {
                 oldDependentTables = getAllInnerFields(childAST, oldDependentTables,
                         fromTablesInfo, originalFieldAliasName);
             }
@@ -455,7 +449,7 @@ public class HQLFieldsConverter {
                 String fieldName = getChild(childAST, "Identifier").toString();
 
                 // 更新 oldDependentTables
-                oldDependentTables = this.addFieldIntoDependentTables(oldDependentTables, tableToFind,
+                oldDependentTables = this.createOrUpdateDependentTables(oldDependentTables, tableToFind,
                         new FieldInfo(fieldName, originalFieldAliasName + "_" + this.innerFieldNumber, tableToFind));
                 this.innerFieldNumber++;
             }
@@ -475,7 +469,7 @@ public class HQLFieldsConverter {
 
                 // 更新
                 if (tableToFind != null) {
-                    oldDependentTables = this.addFieldIntoDependentTables(oldDependentTables, tableToFind,
+                    oldDependentTables = this.createOrUpdateDependentTables(oldDependentTables, tableToFind,
                             new FieldInfo(fieldName, originalFieldAliasName + "_" + this.innerFieldNumber, tableToFind));
                     this.innerFieldNumber++;
                 } else {
@@ -492,13 +486,13 @@ public class HQLFieldsConverter {
     /**
      * 用于更新一个依赖表的列表，加入新字段
      *
-     * @param dependentTables 依赖表列表
+     * @param dependentTables 需要更新依赖表列表
      * @param tableInfo       需要添加字段所依赖的表
      * @param newFieldInfo    需要添加的字段
      * @return 新的依赖表列表
      */
-    public ArrayList<DependentTable> addFieldIntoDependentTables(ArrayList<DependentTable> dependentTables,
-                                                                 TableInfo tableInfo, FieldInfo newFieldInfo) {
+    public ArrayList<DependentTable> createOrUpdateDependentTables(ArrayList<DependentTable> dependentTables,
+                                                                   TableInfo tableInfo, FieldInfo newFieldInfo) {
         /* 原列表已有该依赖表的信息，更新该表的字段列表 */
         int i;
         for (i = 0; i < dependentTables.size(); ++i) {
@@ -534,8 +528,8 @@ public class HQLFieldsConverter {
 
         ArrayList<TableInfo> fromTablesInfo = new ArrayList<TableInfo>();  // 存储 FROM 从句下所有表的信息
         /* 获取得到所有子表的信息表 */
-        // 单表（单子查询）情况，TOK_JOIN -> TOK_TABREF / TOK_SUBQUERY
-        if (getJOINNode(fromNode) == null) {
+        // 单表（单子查询）情况，TOK_TABREF / TOK_SUBQUERY
+        if (getJoinNode(fromNode) == null) {
             if (getChild(fromNode, "TOK_TABREF") != null) {
                 TableInfo tableInfo = getTableInfoOfNode(getChild(fromNode, "TOK_TABREF"));
                 fromTablesInfo.add(tableInfo);  // 表
@@ -546,23 +540,24 @@ public class HQLFieldsConverter {
             }
         } else {
             // 多表情况，TOK_JOIN -> TOK_TABREF / TOK_SUBQUERY / TOK_JOIN
-            ASTNode joinNode = getJOINNode(fromNode);
-            fromTablesInfo.addAll(joinASTAnalyse(joinNode));
+            ASTNode joinNode = getJoinNode(fromNode);
+            fromTablesInfo.addAll(joinAnalyse(joinNode));
         }
         return new FromAnalyseResult(fromTablesInfo);
     }
 
     /**
      * 分析 JOIN AST 列表，得到有序的来源表信息
+     *
      * @param joinNode 需要分析的 JOIN AST 节点
      * @return JOIN 从句中涉及到的来源表
      * @throws Exception 从数据库中获取某数据表信息失败
      */
-    private ArrayList<TableInfo> joinASTAnalyse(ASTNode joinNode) throws Exception {
+    private ArrayList<TableInfo> joinAnalyse(ASTNode joinNode) throws Exception {
         ArrayList<TableInfo> fromTablesInfo = new ArrayList<TableInfo>();
 
         // 类型检查
-        if(!checkIsJOINTypeNode(joinNode)){
+        if (!checkIsJOINTypeNode(joinNode)) {
             return null;
         }
 
@@ -570,7 +565,7 @@ public class HQLFieldsConverter {
         ASTNode child0 = (ASTNode) joinNode.getChild(0);
         TableInfo tableInfo0;
         if (checkIsJOINTypeNode(child0)) {
-            fromTablesInfo.addAll(joinASTAnalyse(child0));
+            fromTablesInfo.addAll(joinAnalyse(child0));
         } else {
             if (child0.getToken().getType() == HiveParser.TOK_TABREF) {
                 tableInfo0 = getTableInfoOfNode(child0);
@@ -618,7 +613,7 @@ public class HQLFieldsConverter {
      * @param parentNode 父亲节点
      * @return JOIN 类型的子节点
      */
-    public static ASTNode getJOINNode(ASTNode parentNode) {
+    public static ASTNode getJoinNode(ASTNode parentNode) {
         for (String type : JOIN_TYPE) {
             if (getChild(parentNode, type) != null) {
                 return getChild(parentNode, type);
@@ -832,17 +827,21 @@ public class HQLFieldsConverter {
      * @return 依赖表，查询不到返回 null
      */
     private DependentTable findTable(FieldInfo field, String tableName, String alias) {
-        for (DependentTable table : dependenceOfTables.get(tableName + ", " + alias)) {
-            // 保证字段来源于该表
-            // Direct From Table 如果为空，说明为包含函数或者表达式的字段，该字段名字唯一
-            if (field.getDirectFromTable() == null || field.getDirectFromTable().equals(table.getTableInfo())) {
+        if (field.getDirectFromTable() == null
+                || tableName.equals(field.getDirectFromTable().getTableName()) && alias.equals(field.getDirectFromTable().getAliasName())) {
+            for (DependentTable table : dependenceOfTables.get(tableName + ", " + alias)) {
+                // 保证字段来源于该表
+                // Direct From Table 如果为空，说明为包含函数或者表达式的字段，该字段名字唯一
+                // if (field.getDirectFromTable() == null || field.getDirectFromTable().toString().equals(table.getTableInfo().toString())) {
                 // 只用表名进行搜索，SELECT 中的字段别名是给上一层使用的
                 if (table.findField(field.getFiledName()) != null) {
                     return table;
                 }
+                // }
             }
         }
-        System.err.println("Err: 无法在依赖表中找到包含该 field 的表");
+        System.err.println("Err: 无法在依赖表中找到包含字段 " + field.toString() +
+                " 的表");
         return null;
     }
 
