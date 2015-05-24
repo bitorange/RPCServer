@@ -1,13 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <property>
-		<entry key="rpc.server">localhost</entry>
-		<entry key="rpc.username">guest</entry>
-		<entry key="rpc.password">guest</entry>
-		<entry key="db.username">admin</entry>
-		<entry key="db.password">admin</entry>
-		<entry key="db.url">jdbc:hive2://10.4.21.220:10000/ihainan</entry>
-		<entry key="db.driver">org.apache.hive.jdbc.HiveDriver</entry>
-		<entry key="db.jdbc.connections">2</entry>
-		<entry key="spark.log.path">/home/ihainan/tmp/sparksql--master-1427427041872/EVENT_LOG_1</entry>
-		<entry key="rules.path">rules</entry>
+    <!-- RabbitMQ Server 地址 -->
+    <entry key="rpc.server">localhost</entry>
+
+    <!-- RabbitMQ Server 用户名，仅当 RabbitMQ Server 在本地时能够使用 Guest 用户 -->
+    <entry key="rpc.username">guest</entry>
+
+    <!-- RabbitMQ Server 密码 -->
+    <entry key="rpc.password">guest</entry>
+
+    <!-- Hive on Spark 数据库用户名 -->
+    <entry key="db.username">admin</entry>
+
+    <!-- Hive on Spark 数据库密码 -->
+    <entry key="db.password">admin</entry>
+
+    <!-- Hive on Spark 数据库地址 -->
+    <entry key="db.url">jdbc:hive2://10.4.21.220:10000/ihainan</entry>
+
+    <!-- Hive on Spark JDBC 驱动 -->
+    <entry key="db.driver">org.apache.hive.jdbc.HiveDriver</entry>
+
+    <!-- Hive on Spark JDBC 数 -->
+    <entry key="db.jdbc.connections">2</entry>
+
+    <!-- Spark 日志文件路径 -->
+    <entry key="spark.log.path">/home/ihainan/tmp/sparksql--master-1427427041872/EVENT_LOG_1</entry>
+
+    <!-- 规则文件路径 -->
+    <entry key="rules.path">rules</entry>
 </property>
