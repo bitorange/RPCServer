@@ -1,7 +1,5 @@
 package org.linc.RPCServer.fieldsconverter.info;
 
-import org.apache.hadoop.hive.ql.parse.ASTNode;
-
 /**
  * 表示一个字段内包含的信息
  */
@@ -27,6 +25,17 @@ public class FieldInfo {
     private String filedName;
     private String fieldAlias;
     private TableInfo directFromTable;
+    private FieldInfo dependentField;
+
+    /**
+     * 当前字段所依赖的字段
+     *
+     * @return 字段所依赖的字段信息
+     */
+    public FieldInfo getDependentField() {
+        return dependentField;
+    }
+
 
     /**
      * 字段的直接来源表
@@ -40,13 +49,16 @@ public class FieldInfo {
     /**
      * 构造函数
      *
-     * @param fieldName  字段名
-     * @param fieldAlias 字段别名
+     * @param fieldName       字段名
+     * @param fieldAlias      字段别名
+     * @param directFromTable 直接来源表
+     * @param dependentField  字段所依赖的字段信息
      */
-    public FieldInfo(String fieldName, String fieldAlias, TableInfo directFromTable) {
+    public FieldInfo(String fieldName, String fieldAlias, TableInfo directFromTable, FieldInfo dependentField) {
         this.fieldAlias = fieldAlias;
         this.filedName = fieldName;
         this.directFromTable = directFromTable;
+        this.dependentField = dependentField;
     }
 
     /**
