@@ -838,12 +838,11 @@ public class HQLFieldsConverter {
                     String aliasName = dependentTableInfo.getAliasName();
                     if (!dependenceOfTables.containsKey(tableName + ", " + aliasName)) {
                         // 获取原始字段名，保存
-                        FieldInfo originalField = dependentTableToFind.findField(fieldToFind.getFiledName());
-                        originalDependentTableList = this.addFieldIntoOriginalDependentTables(originalDependentTableList, dependentTableInfo, originalField.getFiledName());
+                        FieldInfo newFieldToFind = fieldToFind;
+                        originalDependentTableList = this.addFieldIntoOriginalDependentTables(originalDependentTableList, dependentTableInfo, newFieldToFind.getFiledName());
                     } else {
                         // 否则，放入队列
-                        FieldInfo currentField = dependentTableToFind.findField(fieldToFind.getFiledName());
-                        FieldInfo newFieldToFind = currentField.getDependentField();
+                        FieldInfo newFieldToFind = fieldToFind.getDependentField();
                         item = new QueueItem(dependentTableToFind.getTableInfo(), newFieldToFind);
                         queue.add(item);
                     }
